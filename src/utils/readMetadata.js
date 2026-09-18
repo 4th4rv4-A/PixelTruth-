@@ -30,13 +30,16 @@ export async function readMetadata(file) {
  * @returns {'high'|'medium'|'low'}
  */
 export function getPrivacyLevel(metadata) {
-  if (metadata.latitude || metadata.longitude || metadata.GPSLatitude || metadata.GPSLongitude) {
-    return 'high';
+  let level = 'low';
+  for (const tag of SENSITIVE_TAGS) {
+    if (metadata[tag] !== undefined && metadata[tag] !== null && metadata[tag] !== '') {
+      if (['GPSLatitude', 'GPSLongitude', 'latitude', 'longitude'].includes(tag)) {
+        return 'high'; // Highest possible, return immediately
+      }
+      level = 'medium';
+    }
   }
-  if (metadata.Make || metadata.Model || metadata.Software || metadata.LensMake || metadata.LensModel) {
-    return 'medium';
-  }
-  return 'low';
+  return level;
 }
 
 /**

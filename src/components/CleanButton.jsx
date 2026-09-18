@@ -32,8 +32,14 @@ export default function CleanButton({ files }) {
           cleanedBlob = await stripFull(item.file);
         }
 
+        let outputName = item.file.name;
+        if (cleanedBlob.type === 'image/jpeg' && !/\.jpe?g$/i.test(outputName)) {
+          // If we converted a WebP/HEIC to JPEG during stripping, update the extension
+          outputName = outputName.replace(/\.[^/.]+$/, '.jpg');
+        }
+
         cleanedFiles.push({
-          name: item.file.name,
+          name: outputName,
           blob: cleanedBlob,
         });
       }

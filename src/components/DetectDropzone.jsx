@@ -1,7 +1,7 @@
 import { useCallback, useRef, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import {
-  normalizeInput,
+  inspectDimensions,
   ACCEPTED_TYPES,
   ACCEPTED_EXTENSIONS,
   MAX_FILE_SIZE,
@@ -43,12 +43,13 @@ export default function DetectDropzone({ files, onFilesAdded }) {
           continue;
         }
 
-        try {
-          const normalized = await normalizeInput(file);
-          validFiles.push(normalized);
-        } catch {
-          toast.error(`"${file.name}" — failed to process (HEIC conversion error)`);
+        const isSafe = await inspectDimensions(file);
+        if (!isSafe) {
+          toast.error(`"${file.name}" dimensions are too large (exceeds 64MP safe limit)`);
+          continue;
         }
+
+        validFiles.push(file);
       }
 
       if (validFiles.length > 0) {

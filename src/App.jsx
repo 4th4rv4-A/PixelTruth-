@@ -10,6 +10,7 @@ import InstallPrompt from './components/InstallPrompt';
 import ErrorBoundary from './components/ErrorBoundary';
 import { readMetadata, getPrivacyLevel } from './utils/readMetadata';
 import { detectAI } from './utils/detectAI';
+import { createSafeThumbnail, MAX_FILES } from './utils/normalizeInput';
 
 let fileIdCounter = 0;
 
@@ -27,18 +28,30 @@ export default function App() {
    * ════════════════════════════════════════════════════ */
 
   const handleCleanFilesAdded = useCallback(async (newFiles) => {
-    const pendingItems = newFiles.map((file) => ({
-      id: `clean-${++fileIdCounter}`,
-      file,
-      thumbnailUrl: URL.createObjectURL(file),
-      metadata: null,
-      privacyLevel: 'low',
-      keepTags: [],
-    }));
+    const pendingItems = await Promise.all(
+      newFiles.map(async (file) => ({
+        id: `clean-${++fileIdCounter}`,
+        file,
+        thumbnailUrl: await createSafeThumbnail(file),
+        metadata: null,
+        privacyLevel: 'low',
+        keepTags: [],
+      }))
+    );
 
-    setCleanFiles((prev) => [...prev, ...pendingItems]);
+    let allowedItems = [];
+    setCleanFiles((prev) => {
+      const remaining = MAX_FILES - prev.length;
+      if (remaining <= 0) return prev;
+      allowedItems = pendingItems.slice(0, remaining);
+      // Revoke URLs for items that didn't make the cut to prevent leaks
+      pendingItems.slice(remaining).forEach((item) => {
+        if (item.thumbnailUrl) URL.revokeObjectURL(item.thumbnailUrl);
+      });
+      return [...prev, ...allowedItems];
+    });
 
-    for (const item of pendingItems) {
+    for (const item of allowedItems) {
       try {
         const metadata = await readMetadata(item.file);
         const privacyLevel = getPrivacyLevel(metadata);
@@ -82,16 +95,28 @@ export default function App() {
    * ════════════════════════════════════════════════════ */
 
   const handleDetectFilesAdded = useCallback(async (newFiles) => {
-    const pendingItems = newFiles.map((file) => ({
-      id: `detect-${++fileIdCounter}`,
-      file,
-      thumbnailUrl: URL.createObjectURL(file),
-      result: null, // null = analyzing
-    }));
+    const pendingItems = await Promise.all(
+      newFiles.map(async (file) => ({
+        id: `detect-${++fileIdCounter}`,
+        file,
+        thumbnailUrl: await createSafeThumbnail(file),
+        result: null, // null = analyzing
+      }))
+    );
 
-    setDetectFiles((prev) => [...prev, ...pendingItems]);
+    let allowedItems = [];
+    setDetectFiles((prev) => {
+      const remaining = MAX_FILES - prev.length;
+      if (remaining <= 0) return prev;
+      allowedItems = pendingItems.slice(0, remaining);
+      // Revoke URLs for items that didn't make the cut
+      pendingItems.slice(remaining).forEach((item) => {
+        if (item.thumbnailUrl) URL.revokeObjectURL(item.thumbnailUrl);
+      });
+      return [...prev, ...allowedItems];
+    });
 
-    for (const item of pendingItems) {
+    for (const item of allowedItems) {
       try {
         const result = await detectAI(item.file);
         setDetectFiles((prev) =>
@@ -152,7 +177,10 @@ export default function App() {
               </p>
             </div>
 
-            <ErrorBoundary onReset={() => setCleanFiles([])}>
+            <ErrorBoundary onReset={() => {
+              cleanFiles.forEach(f => { if (f.thumbnailUrl) URL.revokeObjectURL(f.thumbnailUrl); });
+              setCleanFiles([]);
+            }}>
               <Dropzone files={cleanFiles} onFilesAdded={handleCleanFilesAdded} />
 
               <FileQueue
@@ -179,7 +207,10 @@ export default function App() {
               </p>
             </div>
 
-            <ErrorBoundary onReset={() => setDetectFiles([])}>
+            <ErrorBoundary onReset={() => {
+              detectFiles.forEach(f => { if (f.thumbnailUrl) URL.revokeObjectURL(f.thumbnailUrl); });
+              setDetectFiles([]);
+            }}>
               <DetectDropzone files={detectFiles} onFilesAdded={handleDetectFilesAdded} />
 
               {/* Detect results */}

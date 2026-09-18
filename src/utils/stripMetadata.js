@@ -15,10 +15,13 @@ export async function stripFull(file) {
   ctx.drawImage(img, 0, 0);
   img.close();
 
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const mimeType = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
     const quality = mimeType === 'image/png' ? undefined : 0.95;
-    canvas.toBlob((blob) => resolve(blob), mimeType, quality);
+    canvas.toBlob((blob) => {
+      if (blob) resolve(blob);
+      else reject(new Error('Canvas toBlob failed to encode image'));
+    }, mimeType, quality);
   });
 }
 

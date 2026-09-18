@@ -111,20 +111,41 @@ export async function checkSoftwareTags(file) {
   }
 }
 
-/**
- * Run full AI detection pipeline on a file.
- * 1. Check C2PA Content Credentials
- * 2. Fall back to software tag heuristics
- * 3. If neither, return inconclusive
- *
- * @param {File} file
- * @returns {Promise<{ verdict: 'verified'|'possible'|'inconclusive', [key: string]: any }>}
- */
 export async function detectAI(file) {
-  // Step 1: C2PA credentials (strongest signal)
+  // Step 1: C2PA credentials
   const c2paResult = await checkC2PA(file);
   if (c2paResult) {
-    return { verdict: 'verified', ...c2paResult };
+    // Determine if it's explicitly AI
+    let isAi = false;
+
+    // Check assertions for AI digitalSourceType
+    for (const assertion of c2paResult.assertions) {
+      if (assertion.label === 'c2pa.actions' && assertion.data?.actions) {
+        for (const action of assertion.data.actions) {
+          const dst = action.parameters?.digitalSourceType;
+          if (
+            dst &&
+            (dst.includes('trainedAlgorithmicMedia') || dst.includes('compositeWithTrainedAlgorithmicMedia'))
+          ) {
+            isAi = true;
+          }
+        }
+      }
+    }
+
+    // Also check if generator name is a known AI generator as fallback
+    if (!isAi) {
+      const combinedGenerator = c2paResult.generator.toLowerCase();
+      if (KNOWN_AI_SOFTWARE_TAGS.some((tag) => combinedGenerator.includes(tag))) {
+        isAi = true;
+      }
+    }
+
+    if (isAi) {
+      return { verdict: 'verified-ai', ...c2paResult };
+    } else {
+      return { verdict: 'verified-provenance', ...c2paResult };
+    }
   }
 
   // Step 2: Software tag heuristic (weaker signal)
