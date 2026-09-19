@@ -27,7 +27,7 @@ async function getC2pa() {
  * @param {File} file
  * @returns {Promise<Object|null>} credential info or null if no C2PA manifest found
  */
-export async function checkC2PA(file) {
+async function checkC2PA(file) {
   try {
     const { Reader } = await import('@contentauth/c2pa-web/inline');
     const c2pa = await getC2pa();
@@ -91,7 +91,7 @@ export async function checkC2PA(file) {
  * @param {File} file
  * @returns {Promise<Object|null>} matched tag info or null
  */
-export async function checkSoftwareTags(file) {
+async function checkSoftwareTags(file) {
   try {
     const metadata = await readMetadata(file);
     const fields = [

@@ -50,7 +50,7 @@ export const ALWAYS_KEEP_TAGS = ['Orientation', 'ColorSpace', 'ICC_Profile'];
 /**
  * Tags considered sensitive / privacy-relevant.
  */
-export const SENSITIVE_TAGS = [
+const SENSITIVE_TAGS = [
   'GPSLatitude', 'GPSLongitude', 'GPSAltitude', 'GPSDateStamp', 'GPSTimeStamp',
   'latitude', 'longitude',
   'Make', 'Model', 'LensMake', 'LensModel',

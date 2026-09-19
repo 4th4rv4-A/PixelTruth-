@@ -20,7 +20,7 @@ export const MAX_FILE_SIZE = 50 * 1024 * 1024;
 export const MAX_FILES = 20;
 
 /** Max safe pixel dimensions (e.g. 64 Megapixels) to prevent decompression bombs */
-export const MAX_PIXELS = 8000 * 8000;
+const MAX_PIXELS = 8000 * 8000;
 
 /**
  * Checks file dimensions using EXIF headers (without full decompression)
