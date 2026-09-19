@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
 import Header from './components/Header';
 import Dropzone from './components/Dropzone';
 import FileQueue from './components/FileQueue';
@@ -124,6 +125,7 @@ export default function App() {
         );
       } catch (err) {
         console.error('Detection failed for', item.file.name, err);
+        toast.error(`Detection failed for "${item.file.name}": ${err.message || 'Unknown error'}`);
         setDetectFiles((prev) =>
           prev.map((f) =>
             f.id === item.id
@@ -215,7 +217,7 @@ export default function App() {
 
               {/* Detect results */}
               {detectFiles.length > 0 && (
-                <div className="space-y-4">
+                <div className="space-y-4" role="region" aria-live="polite" aria-label="Detection results">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <h3 className="text-sm font-semibold text-surface-800 dark:text-surface-200">
@@ -233,6 +235,7 @@ export default function App() {
                         setDetectFiles([]);
                       }}
                       className="text-xs text-surface-400 hover:text-red-500 dark:text-surface-500 dark:hover:text-red-400 transition-colors"
+                      aria-label="Clear all detection results"
                     >
                       Clear all
                     </button>
@@ -262,7 +265,7 @@ export default function App() {
         {/* Footer */}
         <footer className="text-center pt-8 pb-4">
           <p className="text-xs text-surface-400 dark:text-surface-600">
-            PixelTruth v2.0 — Metadata Cleaner & AI Detection
+            PixelTruth v2.0.0 — Metadata Cleaner & AI Detection
           </p>
         </footer>
       </main>

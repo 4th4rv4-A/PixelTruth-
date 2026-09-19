@@ -19,13 +19,30 @@ export const MAX_FILE_SIZE = 50 * 1024 * 1024;
 /** Max files in queue */
 export const MAX_FILES = 20;
 
-/** Max safe pixel dimensions (e.g. 64 Megapixels) to prevent decompression bombs */
-const MAX_PIXELS = 8000 * 8000;
+/** Max safe pixel dimensions (64 Megapixels) to prevent decompression bombs */
+export const MAX_PIXELS = 64 * 1024 * 1024;
 
 /**
- * Checks file dimensions using EXIF headers (without full decompression)
+ * Conservative file size threshold used when image dimensions
+ * cannot be determined from metadata. This is NOT a safety guarantee —
+ * it is a pragmatic gate to allow small files through while rejecting
+ * large files whose pixel count is unknown.
+ */
+const CONSERVATIVE_SIZE_LIMIT = 15 * 1024 * 1024;
+
+/**
+ * Checks file dimensions using EXIF headers (without full decompression).
+ *
+ * Behavior:
+ * - Dimensions found & within limit → { safe: true }
+ * - Dimensions found & over limit  → { safe: false, reason: 'oversized' }
+ * - Dimensions not found, file ≤ 15 MB → { safe: true, reason: 'size-fallback' }
+ * - Dimensions not found, file > 15 MB → { safe: false, reason: 'unverifiable' }
+ * - Metadata parse error, file ≤ 15 MB → { safe: true, reason: 'size-fallback' }
+ * - Metadata parse error, file > 15 MB → { safe: false, reason: 'unverifiable' }
+ *
  * @param {File} file
- * @returns {Promise<boolean>} true if safe, false if too large
+ * @returns {Promise<{ safe: boolean, reason?: string }>}
  */
 export async function inspectDimensions(file) {
   try {
@@ -37,20 +54,37 @@ export async function inspectDimensions(file) {
       iptc: false,
       jfif: true,
     });
-    // Some formats might not report width/height to exifr
-    if (!meta) return true;
 
-    const w = meta.ImageWidth || meta.PixelXDimension || meta.ExifImageWidth;
-    const h = meta.ImageHeight || meta.PixelYDimension || meta.ExifImageHeight;
+    if (meta) {
+      const w = meta.ImageWidth || meta.PixelXDimension || meta.ExifImageWidth;
+      const h = meta.ImageHeight || meta.PixelYDimension || meta.ExifImageHeight;
 
-    if (w && h) {
-      if (w * h > MAX_PIXELS) return false;
+      if (w && h) {
+        if (w * h > MAX_PIXELS) {
+          return { safe: false, reason: 'oversized' };
+        }
+        return { safe: true };
+      }
     }
-    return true;
+
+    // Dimensions not found in metadata — use conservative file size fallback
+    return conservativeFallback(file);
   } catch {
-    // If it fails to parse, we conservatively allow it (might be stripped WebP/PNG)
-    return true;
+    // Metadata parsing failed — use conservative file size fallback
+    return conservativeFallback(file);
   }
+}
+
+/**
+ * Conservative fallback when dimensions cannot be determined.
+ * @param {File} file
+ * @returns {{ safe: boolean, reason: string }}
+ */
+function conservativeFallback(file) {
+  if (file.size <= CONSERVATIVE_SIZE_LIMIT) {
+    return { safe: true, reason: 'size-fallback' };
+  }
+  return { safe: false, reason: 'unverifiable' };
 }
 
 /**
@@ -85,4 +119,3 @@ export async function createSafeThumbnail(file) {
     return '';
   }
 }
-

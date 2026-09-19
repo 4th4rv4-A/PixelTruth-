@@ -1,13 +1,76 @@
 import piexif from 'piexifjs';
+import heic2any from 'heic2any';
+
+/**
+ * Check if a file is HEIC/HEIF format.
+ * @param {File} file
+ * @returns {boolean}
+ */
+function isHeic(file) {
+  return (
+    file.type === 'image/heic' ||
+    file.type === 'image/heif' ||
+    /\.hei[cf]$/i.test(file.name)
+  );
+}
+
+/**
+ * Convert HEIC/HEIF files to JPEG for processing.
+ * Non-HEIC files are returned unchanged.
+ * @param {File} file
+ * @returns {Promise<File>}
+ */
+async function ensureDecodable(file) {
+  if (!isHeic(file)) {
+    return file;
+  }
+
+  const converted = await heic2any({
+    blob: file,
+    toType: 'image/jpeg',
+    quality: 0.95,
+  });
+
+  const blob = Array.isArray(converted) ? converted[0] : converted;
+
+  return new File(
+    [blob],
+    file.name.replace(/\.hei[cf]$/i, '.jpg'),
+    { type: 'image/jpeg' }
+  );
+}
+
+/**
+ * Determine the correct output MIME type for a file.
+ * Preserves PNG and WebP; converts everything else to JPEG.
+ * @param {File} file
+ * @returns {string}
+ */
+function getOutputMime(file) {
+  if (file.type === 'image/png') return 'image/png';
+  if (file.type === 'image/webp') return 'image/webp';
+  return 'image/jpeg';
+}
 
 /**
  * Full strip — draw image onto canvas, re-export as clean blob.
  * Works for all formats. Strips ALL metadata.
- * @param {File} file - already normalized (no HEIC)
+ * HEIC/HEIF files are converted to JPEG before processing.
+ * WebP and PNG formats are preserved; others output as JPEG.
+ * @param {File} file
  * @returns {Promise<Blob>}
  */
 export async function stripFull(file) {
-  const img = await createImageBitmap(file);
+  // Convert HEIC/HEIF to JPEG before processing
+  file = await ensureDecodable(file);
+
+  let img;
+  try {
+    img = await createImageBitmap(file);
+  } catch {
+    throw new Error(`Failed to decode "${file.name}": the image may be corrupt or in an unsupported format.`);
+  }
+
   const canvas = document.createElement('canvas');
   canvas.width = img.width;
   canvas.height = img.height;
@@ -15,12 +78,13 @@ export async function stripFull(file) {
   ctx.drawImage(img, 0, 0);
   img.close();
 
+  const mimeType = getOutputMime(file);
+  const quality = mimeType === 'image/png' ? undefined : 0.95;
+
   return new Promise((resolve, reject) => {
-    const mimeType = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
-    const quality = mimeType === 'image/png' ? undefined : 0.95;
     canvas.toBlob((blob) => {
       if (blob) resolve(blob);
-      else reject(new Error('Canvas toBlob failed to encode image'));
+      else reject(new Error('Failed to encode the cleaned image.'));
     }, mimeType, quality);
   });
 }
@@ -28,11 +92,15 @@ export async function stripFull(file) {
 /**
  * Selective strip — JPEG only. Remove unchecked EXIF tags, keep checked ones.
  * Orientation and ColorSpace are always preserved.
- * @param {File} file - must be JPEG
+ * HEIC/HEIF files are converted to JPEG before processing.
+ * @param {File} file - must be JPEG (or HEIC, which will be converted)
  * @param {string[]} keepTags - tag names to preserve
  * @returns {Promise<Blob>}
  */
 export async function stripSelective(file, keepTags = []) {
+  // Convert HEIC/HEIF to JPEG before processing
+  file = await ensureDecodable(file);
+
   const arrayBuffer = await file.arrayBuffer();
   const dataUrl = arrayBufferToDataUrl(arrayBuffer, 'image/jpeg');
 
@@ -47,9 +115,6 @@ export async function stripSelective(file, keepTags = []) {
   // Always keep Orientation (0x0112) and ColorSpace (0xA001)
   const alwaysKeepIfd0 = { 0x0112: true }; // Orientation
   const alwaysKeepExif = { 0xA001: true };  // ColorSpace
-
-  // Map of human-readable tag names to their piexif IFD + tag ID
-  const tagMap = buildTagMap();
 
   // Build set of tag keys to keep
   const keepSet = new Set(keepTags);
@@ -105,18 +170,7 @@ function dataUrlToBlob(dataUrl) {
   return new Blob([array], { type: mime });
 }
 
-function buildTagMap() {
-  const map = {};
-  for (const [ifdName, tags] of Object.entries(piexif.TAGS)) {
-    for (const [tagId, tagInfo] of Object.entries(tags)) {
-      const name = typeof tagInfo === 'object' ? tagInfo.name : tagInfo;
-      if (name) {
-        map[name] = { ifd: ifdName, tagId: parseInt(tagId, 10) };
-      }
-    }
-  }
-  return map;
-}
+
 
 function getTagName(ifdName, tagId) {
   const ifdKey = ifdName === '0th' ? 'ImageIFD' :

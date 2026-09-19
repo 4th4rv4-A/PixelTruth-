@@ -43,9 +43,13 @@ export default function DetectDropzone({ files, onFilesAdded }) {
           continue;
         }
 
-        const isSafe = await inspectDimensions(file);
-        if (!isSafe) {
-          toast.error(`"${file.name}" dimensions are too large (exceeds 64MP safe limit)`);
+        const dimResult = await inspectDimensions(file);
+        if (!dimResult.safe) {
+          if (dimResult.reason === 'oversized') {
+            toast.error(`"${file.name}" dimensions are too large (exceeds 64MP safe limit)`);
+          } else {
+            toast.error(`"${file.name}" is too large or its dimensions couldn't be verified safely.`);
+          }
           continue;
         }
 
@@ -120,7 +124,16 @@ export default function DetectDropzone({ files, onFilesAdded }) {
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
       onClick={() => inputRef.current?.click()}
-      className="group relative glass-card p-8 sm:p-12 cursor-pointer transition-all duration-300 hover:shadow-xl hover:shadow-violet-500/10 hover:border-violet-300 dark:hover:border-violet-600 [&.drag-over]:border-violet-400 [&.drag-over]:bg-violet-50/50 dark:[&.drag-over]:bg-violet-900/20 [&.drag-over]:shadow-xl [&.drag-over]:shadow-violet-500/20"
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          inputRef.current?.click();
+        }
+      }}
+      role="button"
+      tabIndex={0}
+      aria-label="Upload images for AI detection. Drop files or press Enter to browse."
+      className="group relative glass-card p-8 sm:p-12 cursor-pointer transition-all duration-300 hover:shadow-xl hover:shadow-violet-500/10 hover:border-violet-300 dark:hover:border-violet-600 [&.drag-over]:border-violet-400 [&.drag-over]:bg-violet-50/50 dark:[&.drag-over]:bg-violet-900/20 [&.drag-over]:shadow-xl [&.drag-over]:shadow-violet-500/20 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-offset-2 dark:focus:ring-offset-surface-950"
       id="detect-dropzone"
     >
       <input

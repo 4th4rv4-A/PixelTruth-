@@ -3,7 +3,7 @@ import { useState } from 'react';
 export default function CredentialDetails({ result }) {
   const [expanded, setExpanded] = useState(false);
 
-  if (!result || result.verdict !== 'verified') return null;
+  if (!result || !result.verdict?.startsWith('verified')) return null;
 
   return (
     <div className="border-t border-surface-200/60 dark:border-surface-700/40">

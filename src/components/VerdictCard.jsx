@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import CredentialDetails from './CredentialDetails';
 
 export default function VerdictCard({ item }) {
@@ -55,9 +54,9 @@ export default function VerdictCard({ item }) {
           <polyline points="9 11 12 14 22 4" />
         </svg>
       ),
-      title: 'Verified Provenance (Non-synthetic)',
+      title: 'Content Credential Found — No AI Marker',
       getDescription: (r) =>
-        `Valid Content Credential found from ${r.issuer} (${r.generator}), but no AI generation markers are present. This typically indicates a standard digital camera or software credential.`,
+        `A Content Credential was found from ${r.issuer} (${r.generator}), but no AI-generation markers were identified. This does not prove the image is non-synthetic — it only means no AI marker was present in the credential.`,
     },
     possible: {
       borderColor: 'border-l-amber-500',

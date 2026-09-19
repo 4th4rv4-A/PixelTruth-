@@ -1,10 +1,36 @@
 import { useState } from 'react';
+import toast from 'react-hot-toast';
 import { stripFull, stripSelective } from '../utils/stripMetadata';
 import { downloadAsZip, downloadSingle } from '../utils/zipDownload';
+
+/**
+ * Format bytes into a human-readable string.
+ */
+function formatSize(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+}
+
+/**
+ * Format a size comparison result.
+ */
+function formatSizeComparison(original, cleaned) {
+  const diff = original - cleaned;
+  const pct = ((Math.abs(diff) / original) * 100).toFixed(1);
+
+  if (diff > 0) {
+    return `Saved ${formatSize(diff)} (${pct}%)`;
+  } else if (diff < 0) {
+    return `Increased by ${formatSize(-diff)} (${pct}%)`;
+  }
+  return 'Same size';
+}
 
 export default function CleanButton({ files }) {
   const [processing, setProcessing] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0 });
+  const [sizeReport, setSizeReport] = useState(null);
 
   if (files.length === 0) return null;
 
@@ -12,15 +38,18 @@ export default function CleanButton({ files }) {
 
   const handleClean = async () => {
     setProcessing(true);
+    setSizeReport(null);
     setProgress({ current: 0, total: files.length });
 
-    try {
-      const cleanedFiles = [];
+    const cleanedFiles = [];
+    const sizeEntries = [];
+    let errorCount = 0;
 
-      for (let i = 0; i < files.length; i++) {
-        const item = files[i];
-        setProgress({ current: i + 1, total: files.length });
+    for (let i = 0; i < files.length; i++) {
+      const item = files[i];
+      setProgress({ current: i + 1, total: files.length });
 
+      try {
         let cleanedBlob;
         const isJpeg = item.file.type === 'image/jpeg';
 
@@ -33,28 +62,66 @@ export default function CleanButton({ files }) {
         }
 
         let outputName = item.file.name;
+        // If we converted to JPEG (from WebP, HEIC, etc.), update the extension
         if (cleanedBlob.type === 'image/jpeg' && !/\.jpe?g$/i.test(outputName)) {
-          // If we converted a WebP/HEIC to JPEG during stripping, update the extension
           outputName = outputName.replace(/\.[^/.]+$/, '.jpg');
+        }
+        // If format preserved as WebP, ensure extension matches
+        if (cleanedBlob.type === 'image/webp' && !/\.webp$/i.test(outputName)) {
+          outputName = outputName.replace(/\.[^/.]+$/, '.webp');
         }
 
         cleanedFiles.push({
           name: outputName,
           blob: cleanedBlob,
         });
-      }
 
-      if (isBulk) {
-        await downloadAsZip(cleanedFiles);
-      } else {
-        downloadSingle(cleanedFiles[0].name, cleanedFiles[0].blob);
+        sizeEntries.push({
+          name: outputName,
+          originalSize: item.file.size,
+          cleanedSize: cleanedBlob.size,
+        });
+      } catch (err) {
+        errorCount++;
+        toast.error(`Failed to clean "${item.file.name}": ${err.message || 'Unknown error'}`);
+        console.error('Clean failed for', item.file.name, err);
       }
-    } catch (err) {
-      console.error('Clean failed:', err);
-    } finally {
-      setProcessing(false);
-      setProgress({ current: 0, total: 0 });
     }
+
+    if (cleanedFiles.length > 0) {
+      try {
+        if (isBulk || cleanedFiles.length > 1) {
+          await downloadAsZip(cleanedFiles);
+        } else {
+          downloadSingle(cleanedFiles[0].name, cleanedFiles[0].blob);
+        }
+
+        // Calculate totals for size report
+        const totalOriginal = sizeEntries.reduce((sum, e) => sum + e.originalSize, 0);
+        const totalCleaned = sizeEntries.reduce((sum, e) => sum + e.cleanedSize, 0);
+        setSizeReport({
+          entries: sizeEntries,
+          totalOriginal,
+          totalCleaned,
+        });
+      } catch (err) {
+        toast.error(`Download failed: ${err.message || 'Unknown error'}`);
+        console.error('Download failed:', err);
+      }
+    }
+
+    if (errorCount > 0 && cleanedFiles.length > 0) {
+      toast(`${cleanedFiles.length} file${cleanedFiles.length === 1 ? '' : 's'} cleaned, ${errorCount} failed`, {
+        icon: '⚠️',
+      });
+    } else if (errorCount > 0 && cleanedFiles.length === 0) {
+      toast.error('All files failed to process.');
+    } else if (cleanedFiles.length > 0) {
+      toast.success(`${cleanedFiles.length} file${cleanedFiles.length === 1 ? '' : 's'} cleaned successfully!`);
+    }
+
+    setProcessing(false);
+    setProgress({ current: 0, total: 0 });
   };
 
   return (
@@ -113,6 +180,44 @@ export default function CleanButton({ files }) {
           )}
         </span>
       </button>
+
+      {/* Size report */}
+      {sizeReport && (
+        <div className="mt-3 glass-card p-4 space-y-2 animate-fade-in-up" role="status" aria-live="polite">
+          <h3 className="text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider">
+            Size Report
+          </h3>
+          {sizeReport.entries.length === 1 ? (
+            <div className="text-sm text-surface-600 dark:text-surface-400">
+              <span>Original: {formatSize(sizeReport.totalOriginal)}</span>
+              <span className="mx-2">→</span>
+              <span>Cleaned: {formatSize(sizeReport.totalCleaned)}</span>
+              <span className="ml-2 text-xs text-surface-400 dark:text-surface-500">
+                ({formatSizeComparison(sizeReport.totalOriginal, sizeReport.totalCleaned)})
+              </span>
+            </div>
+          ) : (
+            <>
+              <div className="text-sm text-surface-600 dark:text-surface-400 font-medium">
+                Total: {formatSize(sizeReport.totalOriginal)} → {formatSize(sizeReport.totalCleaned)}
+                <span className="ml-2 text-xs text-surface-400 dark:text-surface-500">
+                  ({formatSizeComparison(sizeReport.totalOriginal, sizeReport.totalCleaned)})
+                </span>
+              </div>
+              <div className="max-h-32 overflow-y-auto space-y-1">
+                {sizeReport.entries.map((entry, i) => (
+                  <div key={i} className="text-xs text-surface-500 dark:text-surface-400 flex justify-between">
+                    <span className="truncate mr-2">{entry.name}</span>
+                    <span className="flex-shrink-0">
+                      {formatSize(entry.originalSize)} → {formatSize(entry.cleanedSize)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Privacy assurance */}
       <p className="mt-3 text-center text-xs text-surface-400 dark:text-surface-500 flex items-center justify-center gap-1.5">
