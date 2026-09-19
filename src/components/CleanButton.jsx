@@ -130,17 +130,12 @@ export default function CleanButton({ files }) {
         id="clean-button"
         onClick={handleClean}
         disabled={processing}
-        className="w-full relative group overflow-hidden rounded-2xl bg-gradient-to-r from-accent-500 to-accent-600 hover:from-accent-600 hover:to-accent-700 text-white font-semibold py-4 px-6 transition-all duration-300 shadow-lg shadow-accent-500/25 hover:shadow-xl hover:shadow-accent-500/30 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:shadow-lg"
+        className="w-full relative group overflow-hidden rounded-lg bg-safelight-500 hover:bg-safelight-400 text-ink-50 font-semibold py-4 px-6 transition-all duration-300 shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
       >
-        {/* Shimmer effect */}
-        {!processing && (
-          <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 animate-shimmer" />
-        )}
-
         {/* Progress bar */}
         {processing && progress.total > 0 && (
           <div
-            className="absolute bottom-0 left-0 h-1 bg-white/30 transition-all duration-300"
+            className="absolute bottom-0 left-0 h-1 bg-ink-950/20 transition-all duration-300"
             style={{
               width: `${(progress.current / progress.total) * 100}%`,
             }}
@@ -183,30 +178,30 @@ export default function CleanButton({ files }) {
 
       {/* Size report */}
       {sizeReport && (
-        <div className="mt-3 glass-card p-4 space-y-2 animate-fade-in-up" role="status" aria-live="polite">
-          <h3 className="text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider">
+        <div className="mt-3 frame p-4 space-y-2 animate-fade-in-up" role="status" aria-live="polite">
+          <h3 className="text-xs font-semibold text-ink-500 dark:text-ink-400 uppercase tracking-wider">
             Size Report
           </h3>
           {sizeReport.entries.length === 1 ? (
-            <div className="text-sm text-surface-600 dark:text-surface-400">
+            <div className="text-sm text-ink-600 dark:text-ink-400">
               <span>Original: {formatSize(sizeReport.totalOriginal)}</span>
               <span className="mx-2">→</span>
               <span>Cleaned: {formatSize(sizeReport.totalCleaned)}</span>
-              <span className="ml-2 text-xs text-surface-400 dark:text-surface-500">
+              <span className="ml-2 text-xs text-ink-400 dark:text-ink-500">
                 ({formatSizeComparison(sizeReport.totalOriginal, sizeReport.totalCleaned)})
               </span>
             </div>
           ) : (
             <>
-              <div className="text-sm text-surface-600 dark:text-surface-400 font-medium">
+              <div className="text-sm text-ink-600 dark:text-ink-400 font-medium">
                 Total: {formatSize(sizeReport.totalOriginal)} → {formatSize(sizeReport.totalCleaned)}
-                <span className="ml-2 text-xs text-surface-400 dark:text-surface-500">
+                <span className="ml-2 text-xs text-ink-400 dark:text-ink-500">
                   ({formatSizeComparison(sizeReport.totalOriginal, sizeReport.totalCleaned)})
                 </span>
               </div>
               <div className="max-h-32 overflow-y-auto space-y-1">
                 {sizeReport.entries.map((entry, i) => (
-                  <div key={i} className="text-xs text-surface-500 dark:text-surface-400 flex justify-between">
+                  <div key={i} className="text-xs text-ink-500 dark:text-ink-400 flex justify-between">
                     <span className="truncate mr-2">{entry.name}</span>
                     <span className="flex-shrink-0">
                       {formatSize(entry.originalSize)} → {formatSize(entry.cleanedSize)}
@@ -220,7 +215,7 @@ export default function CleanButton({ files }) {
       )}
 
       {/* Privacy assurance */}
-      <p className="mt-3 text-center text-xs text-surface-400 dark:text-surface-500 flex items-center justify-center gap-1.5">
+      <p className="mt-3 text-center text-xs text-ink-400 dark:text-ink-500 flex items-center justify-center gap-1.5">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
           <path d="M7 11V7a5 5 0 0 1 10 0v4" />

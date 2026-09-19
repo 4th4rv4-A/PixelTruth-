@@ -48,7 +48,7 @@ export default function MetadataTable({ metadata, keepTags, onToggleTag, isJpeg 
 
   if (entries.length === 0) {
     return (
-      <div className="px-4 py-6 text-center text-sm text-surface-400 dark:text-surface-500">
+      <div className="px-4 py-6 text-center text-sm text-ink-400 dark:text-ink-500">
         No metadata found in this image.
       </div>
     );
@@ -79,20 +79,20 @@ export default function MetadataTable({ metadata, keepTags, onToggleTag, isJpeg 
         </div>
       )}
 
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto frame">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-surface-200 dark:border-surface-700">
-              <th className="text-left px-4 py-2.5 text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider w-10">
+            <tr className="border-b border-ink-300 dark:border-ink-700">
+              <th className="text-left px-4 py-2.5 text-xs font-semibold text-ink-500 dark:text-ink-400 uppercase tracking-wider w-10">
                 Keep
               </th>
-              <th className="text-left px-4 py-2.5 text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider">
+              <th className="text-left px-4 py-2.5 text-xs font-semibold text-ink-500 dark:text-ink-400 uppercase tracking-wider">
                 Tag
               </th>
-              <th className="text-left px-4 py-2.5 text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider">
+              <th className="text-left px-4 py-2.5 text-xs font-semibold text-ink-500 dark:text-ink-400 uppercase tracking-wider">
                 Value
               </th>
-              <th className="text-left px-4 py-2.5 text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider w-36">
+              <th className="text-left px-4 py-2.5 text-xs font-semibold text-ink-500 dark:text-ink-400 uppercase tracking-wider w-36">
                 Status
               </th>
             </tr>
@@ -122,7 +122,7 @@ function GroupRows({ group, entries, keepTags, onToggleTag, isJpeg, isAlwaysKept
       <tr>
         <td
           colSpan={4}
-          className="px-4 pt-4 pb-1.5 text-xs font-bold text-surface-600 dark:text-surface-300 bg-surface-50/50 dark:bg-surface-900/30"
+          className="px-4 pt-4 pb-1.5 text-xs font-bold text-ink-600 dark:text-ink-300 bg-ink-100 dark:bg-ink-800"
         >
           {group}
         </td>
@@ -135,7 +135,7 @@ function GroupRows({ group, entries, keepTags, onToggleTag, isJpeg, isAlwaysKept
         return (
           <tr
             key={key}
-            className="border-b border-surface-100 dark:border-surface-800 hover:bg-surface-50 dark:hover:bg-surface-800/30 transition-colors"
+            className="border-b border-ink-200 dark:border-ink-800 hover:bg-ink-50 dark:hover:bg-ink-900/50 transition-colors"
           >
             <td className="px-4 py-2.5 text-center">
               <input
@@ -143,18 +143,18 @@ function GroupRows({ group, entries, keepTags, onToggleTag, isJpeg, isAlwaysKept
                 checked={kept}
                 disabled={checkboxDisabled}
                 onChange={() => onToggleTag(key)}
-                className="w-4 h-4 rounded border-surface-300 dark:border-surface-600 text-accent-600 focus:ring-accent-500 focus:ring-offset-0 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                className="w-4 h-4 rounded-sm border-ink-400 dark:border-ink-600 text-safelight-600 focus:ring-safelight-500 focus:ring-offset-0 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
               />
             </td>
-            <td className="px-4 py-2.5 font-mono text-xs text-surface-700 dark:text-surface-300">
+            <td className="px-4 py-2.5 font-mono text-xs text-ink-700 dark:text-ink-300">
               {key}
             </td>
-            <td className="px-4 py-2.5 text-surface-600 dark:text-surface-400 max-w-xs truncate" title={formatValue(value)}>
+            <td className="px-4 py-2.5 text-ink-600 dark:text-ink-400 max-w-xs truncate" title={formatValue(value)}>
               {formatValue(value)}
             </td>
             <td className="px-4 py-2.5">
               {alwaysKept ? (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-sm text-xs font-medium bg-ink-200 text-ink-700 dark:bg-ink-800 dark:text-ink-300">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                     <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
                     <path d="M7 11V7a5 5 0 0 1 10 0v4" />
@@ -162,11 +162,11 @@ function GroupRows({ group, entries, keepTags, onToggleTag, isJpeg, isAlwaysKept
                   Always kept
                 </span>
               ) : kept ? (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-sm text-xs font-medium bg-develop-500/20 text-develop-600 dark:text-develop-400">
                   ✓ Keeping
                 </span>
               ) : (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-sm text-xs font-medium bg-warn-500/20 text-warn-600 dark:text-warn-400">
                   ✕ Will remove
                 </span>
               )}

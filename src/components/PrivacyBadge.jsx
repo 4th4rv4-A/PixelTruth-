@@ -4,19 +4,19 @@ export default function PrivacyBadge({ level }) {
       icon: '🔴',
       label: 'Contains GPS location',
       classes:
-        'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800/40',
+        'bg-safelight-500/10 text-safelight-600 border-safelight-500/20 dark:text-safelight-400',
     },
     medium: {
       icon: '🟡',
       label: 'Contains device info',
       classes:
-        'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800/40',
+        'bg-warn-500/10 text-warn-600 border-warn-500/20 dark:text-warn-400',
     },
     low: {
       icon: '🟢',
       label: 'No sensitive metadata',
       classes:
-        'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800/40',
+        'bg-develop-500/10 text-develop-600 border-develop-500/20 dark:text-develop-400',
     },
   };
 
@@ -24,7 +24,7 @@ export default function PrivacyBadge({ level }) {
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${classes}`}
+      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-sm text-xs font-medium border transition-colors ${classes}`}
     >
       <span className="text-[10px] leading-none">{icon}</span>
       {label}

@@ -133,7 +133,7 @@ export default function DetectDropzone({ files, onFilesAdded }) {
       role="button"
       tabIndex={0}
       aria-label="Upload images for AI detection. Drop files or press Enter to browse."
-      className="group relative glass-card p-8 sm:p-12 cursor-pointer transition-all duration-300 hover:shadow-xl hover:shadow-violet-500/10 hover:border-violet-300 dark:hover:border-violet-600 [&.drag-over]:border-violet-400 [&.drag-over]:bg-violet-50/50 dark:[&.drag-over]:bg-violet-900/20 [&.drag-over]:shadow-xl [&.drag-over]:shadow-violet-500/20 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-offset-2 dark:focus:ring-offset-surface-950"
+      className="group relative frame border-dashed border-ink-400 p-8 sm:p-12 cursor-pointer transition-all duration-300 [&.drag-over]:border-solid [&.drag-over]:border-safelight-500 [&.drag-over]:bg-safelight-500/5 focus:outline-none focus:ring-2 focus:ring-safelight-500 focus:ring-offset-2 dark:focus:ring-offset-ink-950"
       id="detect-dropzone"
     >
       <input
@@ -150,8 +150,8 @@ export default function DetectDropzone({ files, onFilesAdded }) {
 
       <div className="flex flex-col items-center gap-4 text-center">
         {/* Detect icon */}
-        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-100 to-violet-200 dark:from-violet-900/40 dark:to-violet-800/40 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-violet-600 dark:text-violet-400">
+        <div className="w-16 h-16 rounded-sm bg-ink-100 dark:bg-ink-800 flex items-center justify-center">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-ink-400">
             <circle cx="11" cy="11" r="8" />
             <path d="m21 21-4.3-4.3" />
             <path d="M11 8v6" />
@@ -160,19 +160,19 @@ export default function DetectDropzone({ files, onFilesAdded }) {
         </div>
 
         <div>
-          <p className="text-lg font-semibold text-surface-800 dark:text-surface-200">
+          <p className="text-lg font-semibold text-ink-800 dark:text-ink-200">
             Drop images to inspect for AI markers
           </p>
-          <p className="mt-1.5 text-sm text-surface-500 dark:text-surface-400">
+          <p className="mt-1.5 text-sm text-ink-500 dark:text-ink-400">
             Checks C2PA Content Credentials and software metadata tags
           </p>
-          <p className="mt-1 text-xs text-surface-400 dark:text-surface-500">
+          <p className="mt-1 text-xs text-ink-400 dark:text-ink-500">
             JPEG, PNG, WebP, HEIC — up to 20 files, 50 MB each
           </p>
         </div>
 
         {/* Disclaimer */}
-        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-surface-100 dark:bg-surface-800 text-surface-500 dark:text-surface-400 text-xs font-medium">
+        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-sm bg-ink-100 dark:bg-ink-800 text-ink-500 dark:text-ink-400 text-xs font-medium">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="10" />
             <line x1="12" y1="16" x2="12" y2="12" />

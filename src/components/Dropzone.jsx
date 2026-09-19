@@ -137,7 +137,7 @@ export default function Dropzone({ files, onFilesAdded }) {
       role="button"
       tabIndex={0}
       aria-label="Upload images for metadata cleaning. Drop files or press Enter to browse."
-      className="group relative glass-card p-8 sm:p-12 cursor-pointer transition-all duration-300 hover:shadow-xl hover:shadow-accent-500/10 hover:border-accent-300 dark:hover:border-accent-600 [&.drag-over]:border-accent-400 [&.drag-over]:bg-accent-50/50 dark:[&.drag-over]:bg-accent-900/20 [&.drag-over]:shadow-xl [&.drag-over]:shadow-accent-500/20 focus:outline-none focus:ring-2 focus:ring-accent-500 focus:ring-offset-2 dark:focus:ring-offset-surface-950"
+      className="group relative frame border-dashed border-ink-400 p-8 sm:p-12 cursor-pointer transition-all duration-300 [&.drag-over]:border-solid [&.drag-over]:border-safelight-500 [&.drag-over]:bg-safelight-500/5 focus:outline-none focus:ring-2 focus:ring-safelight-500 focus:ring-offset-2 dark:focus:ring-offset-ink-950"
       id="dropzone"
     >
       <input
@@ -154,8 +154,8 @@ export default function Dropzone({ files, onFilesAdded }) {
 
       <div className="flex flex-col items-center gap-4 text-center">
         {/* Upload icon */}
-        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-accent-100 to-accent-200 dark:from-accent-900/40 dark:to-accent-800/40 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-accent-600 dark:text-accent-400">
+        <div className="w-16 h-16 rounded-sm bg-ink-100 dark:bg-ink-800 flex items-center justify-center">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-ink-400">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
             <polyline points="17 8 12 3 7 8" />
             <line x1="12" y1="3" x2="12" y2="15" />
@@ -163,22 +163,22 @@ export default function Dropzone({ files, onFilesAdded }) {
         </div>
 
         <div>
-          <p className="text-lg font-semibold text-surface-800 dark:text-surface-200">
+          <p className="text-lg font-semibold text-ink-800 dark:text-ink-200">
             Drop images here or{' '}
-            <span className="text-accent-600 dark:text-accent-400 underline decoration-accent-300 dark:decoration-accent-600 underline-offset-2">
+            <span className="text-safelight-600 dark:text-safelight-400 underline decoration-safelight-300 dark:decoration-safelight-600 underline-offset-2">
               browse
             </span>
           </p>
-          <p className="mt-1.5 text-sm text-surface-500 dark:text-surface-400">
+          <p className="mt-1.5 text-sm text-ink-500 dark:text-ink-400">
             JPEG, PNG, WebP, HEIC — up to 20 files, 50 MB each
           </p>
-          <p className="mt-1 text-xs text-surface-400 dark:text-surface-500">
+          <p className="mt-1 text-xs text-ink-400 dark:text-ink-500">
             You can also paste images from your clipboard (Ctrl+V)
           </p>
         </div>
 
         {/* HEIC note */}
-        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 text-xs font-medium">
+        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-sm bg-warn-500/10 text-warn-500 text-xs font-medium">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="10" />
             <line x1="12" y1="16" x2="12" y2="12" />
