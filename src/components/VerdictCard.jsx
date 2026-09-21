@@ -48,7 +48,7 @@ export default function VerdictCard({ item }) {
       ),
       title: 'Content Credential Found — No AI Marker',
       getDescription: (r) =>
-        `A Content Credential was found from ${r.issuer} (${r.generator}), but no AI-generation markers were identified. This does not prove the image is non-synthetic — it only means no AI marker was present in the credential.`,
+        `A provenance credential was found from ${r.issuer} (${r.generator}), but no AI-generation marker was identified in the available credential. This does not prove that the image is non-synthetic.`,
     },
     possible: {
       borderColor: 'border-l-warn-500',
@@ -74,8 +74,9 @@ export default function VerdictCard({ item }) {
           <line x1="12" y1="17" x2="12.01" y2="17" />
         </svg>
       ),
-      title: 'No AI markers detected',
-      getDescription: () =>
+      title: (r) => r.validationNote ? 'Unverified Content Credential' : 'No AI markers detected',
+      getDescription: (r) =>
+        r.validationNote ||
         'No C2PA credential or generator tag found. This does not confirm the image is real — metadata may have been stripped or was never present.',
     },
   };
@@ -102,7 +103,7 @@ export default function VerdictCard({ item }) {
             <div className="flex items-center gap-2 mb-2">
               {config.icon}
               <h3 className={`text-base font-bold ${config.badgeText}`}>
-                {config.title}
+                {typeof config.title === 'function' ? config.title(result) : config.title}
               </h3>
             </div>
 

@@ -1,18 +1,6 @@
 import piexif from 'piexifjs';
 import heic2any from 'heic2any';
-
-/**
- * Check if a file is HEIC/HEIF format.
- * @param {File} file
- * @returns {boolean}
- */
-function isHeic(file) {
-  return (
-    file.type === 'image/heic' ||
-    file.type === 'image/heif' ||
-    /\.hei[cf]$/i.test(file.name)
-  );
-}
+import { isHeic } from './filenameUtils';
 
 /**
  * Convert HEIC/HEIF files to JPEG for processing.
@@ -81,12 +69,26 @@ export async function stripFull(file) {
   const mimeType = getOutputMime(file);
   const quality = mimeType === 'image/png' ? undefined : 0.95;
 
-  return new Promise((resolve, reject) => {
-    canvas.toBlob((blob) => {
-      if (blob) resolve(blob);
+  const blob = await new Promise((resolve, reject) => {
+    canvas.toBlob((b) => {
+      if (b) resolve(b);
       else reject(new Error('Failed to encode the cleaned image.'));
     }, mimeType, quality);
   });
+
+  // WebP verification: If WebP was requested but browser produced non-WebP (e.g. image/png),
+  // explicitly convert to JPEG so extension and byte format are strictly aligned
+  if (mimeType === 'image/webp' && blob.type !== 'image/webp') {
+    const fallbackJpeg = await new Promise((resolve, reject) => {
+      canvas.toBlob((b) => {
+        if (b) resolve(b);
+        else reject(new Error('Failed to encode image to fallback JPEG.'));
+      }, 'image/jpeg', 0.95);
+    });
+    return fallbackJpeg;
+  }
+
+  return blob;
 }
 
 /**

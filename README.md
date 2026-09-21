@@ -83,6 +83,8 @@ src/
     ├── stripMetadata.js        # Full and selective metadata stripping
     ├── normalizeInput.js       # File validation, dimension safety, thumbnails
     ├── zipDownload.js          # ZIP bundling with filename deduplication
+    ├── filenameUtils.js        # Output MIME/extension mapping and resolution
+    ├── sizeUtils.js            # Size formatting and delta calculation
     └── verdicts.js             # Centralized verdict constants
 ```
 

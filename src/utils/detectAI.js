@@ -12,15 +12,20 @@ const KNOWN_AI_SOFTWARE_TAGS = [
   'copilot designer', 'craiyon', 'starryai',
 ];
 
-/** Cached C2PA instance — singleton, reused across calls. */
-let c2paInstance = null;
+/** Cached C2PA promise singleton, reused across calls to prevent concurrent worker spawn */
+let c2paPromise = null;
 
 async function getC2pa() {
-  if (!c2paInstance) {
-    const { createC2pa } = await import('@contentauth/c2pa-web/inline');
-    c2paInstance = await createC2pa();
+  if (!c2paPromise) {
+    c2paPromise = (async () => {
+      const { createC2pa } = await import('@contentauth/c2pa-web/inline');
+      return await createC2pa();
+    })().catch((err) => {
+      c2paPromise = null;
+      throw err;
+    });
   }
-  return c2paInstance;
+  return c2paPromise;
 }
 
 /**
@@ -33,8 +38,48 @@ async function getC2pa() {
  * @param {string|null|undefined} validationState
  * @returns {boolean}
  */
-function isValidationVerified(validationState) {
+export function isValidationVerified(validationState) {
   return validationState === 'Valid' || validationState === 'Trusted';
+}
+
+/**
+ * Pure function implementing the verdict state machine according to the semantic model:
+ *
+ * Case A — No provenance:
+ *   If software tag matches: 'possible'
+ *   Otherwise: 'inconclusive'
+ * Case B — Manifest exists but validation is 'Invalid':
+ *   'inconclusive' (no verified claim)
+ * Case C — Manifest exists, validation is 'Valid' or 'Trusted', and AI marker found:
+ *   'verified-ai'
+ * Case D — Manifest exists, validation is 'Valid' or 'Trusted', and no AI marker:
+ *   'verified-provenance'
+ * Case E — Manifest exists, but validation state is null/undefined or unknown:
+ *   'inconclusive' (no verified claim)
+ *
+ * @param {Object} params
+ * @param {boolean} params.hasManifest
+ * @param {string|null|undefined} params.validationState
+ * @param {boolean} [params.hasAiMarker]
+ * @param {boolean} [params.hasSoftwareTag]
+ * @returns {string} verdict string from VERDICTS
+ */
+export function determineVerdict({
+  hasManifest,
+  validationState,
+  hasAiMarker = false,
+  hasSoftwareTag = false,
+}) {
+  if (!hasManifest) {
+    return hasSoftwareTag ? VERDICTS.POSSIBLE : VERDICTS.INCONCLUSIVE;
+  }
+
+  const isVerified = isValidationVerified(validationState);
+  if (!isVerified) {
+    return VERDICTS.INCONCLUSIVE;
+  }
+
+  return hasAiMarker ? VERDICTS.VERIFIED_AI : VERDICTS.VERIFIED_PROVENANCE;
 }
 
 /**
@@ -183,9 +228,37 @@ async function checkSoftwareTags(file) {
  * @param {File} file
  * @returns {Promise<Object>} result with verdict and optional metadata
  */
+/**
+ * Wrapper with timeout to prevent the UI from hanging if C2PA WASM
+ * initialization takes too long or fails silently.
+ */
+async function checkC2PAWithTimeout(file, ms = 5000) {
+  let timer;
+  const timeoutPromise = new Promise((resolve) => {
+    timer = setTimeout(() => {
+      console.warn(`C2PA check timed out after ${ms}ms for ${file.name}`);
+      resolve(null);
+    }, ms);
+  });
+
+  try {
+    const result = await Promise.race([checkC2PA(file), timeoutPromise]);
+    return result;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export async function detectAI(file) {
+  console.log('[PixelTruth] detectAI started for:', file.name);
   // Step 1: C2PA credentials
-  const c2paResult = await checkC2PA(file);
+  let c2paResult = null;
+  try {
+    c2paResult = await checkC2PAWithTimeout(file);
+    console.log('[PixelTruth] C2PA check result:', c2paResult);
+  } catch (err) {
+    console.warn('[PixelTruth] C2PA check exception:', err);
+  }
   if (c2paResult) {
     const validated = isValidationVerified(c2paResult.validationState);
 
@@ -215,23 +288,27 @@ export async function detectAI(file) {
       }
     }
 
+    const verdict = determineVerdict({
+      hasManifest: true,
+      validationState: c2paResult.validationState,
+      hasAiMarker: isAi,
+    });
+
     // Gate on validation state: only claim verified if SDK confirms validity
     if (!validated) {
       // Manifest found but validation not established — downgrade
       return {
-        verdict: VERDICTS.INCONCLUSIVE,
+        verdict,
         ...c2paResult,
-        validationNote: c2paResult.validationState
-          ? `Credential found but validation state is "${c2paResult.validationState}".`
-          : 'Credential found but validation could not be established.',
+        validationNote: c2paResult.validationState === 'Invalid'
+          ? 'Credential found but validation state is "Invalid" (cryptographic verification failed).'
+          : (c2paResult.validationState
+              ? `Credential found but validation state is "${c2paResult.validationState}".`
+              : 'Credential found but validation could not be cryptographically established.'),
       };
     }
 
-    if (isAi) {
-      return { verdict: VERDICTS.VERIFIED_AI, ...c2paResult };
-    } else {
-      return { verdict: VERDICTS.VERIFIED_PROVENANCE, ...c2paResult };
-    }
+    return { verdict, ...c2paResult };
   }
 
   // Step 2: Software tag heuristic (weaker signal)

@@ -76,7 +76,17 @@ function FileFrame({ item, isExpanded, onToggleExpand, onRemove }) {
 
   return (
     <div 
-      className={`relative flex-shrink-0 w-36 h-36 frame overflow-hidden cursor-pointer snap-start transition-all ${
+      role="button"
+      tabIndex={0}
+      aria-label={`Inspect metadata for ${item.file.name}`}
+      aria-expanded={isExpanded}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onToggleExpand();
+        }
+      }}
+      className={`relative flex-shrink-0 w-36 h-36 frame overflow-hidden cursor-pointer snap-start transition-all focus:outline-none focus:ring-2 focus:ring-safelight-500 ${
         isExpanded ? 'ring-2 ring-safelight-500 border-safelight-500' : 'hover:border-ink-400'
       }`}
       onClick={onToggleExpand}

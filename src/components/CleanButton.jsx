@@ -2,30 +2,8 @@ import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { stripFull, stripSelective } from '../utils/stripMetadata';
 import { downloadAsZip, downloadSingle } from '../utils/zipDownload';
-
-/**
- * Format bytes into a human-readable string.
- */
-function formatSize(bytes) {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
-}
-
-/**
- * Format a size comparison result.
- */
-function formatSizeComparison(original, cleaned) {
-  const diff = original - cleaned;
-  const pct = ((Math.abs(diff) / original) * 100).toFixed(1);
-
-  if (diff > 0) {
-    return `Saved ${formatSize(diff)} (${pct}%)`;
-  } else if (diff < 0) {
-    return `Increased by ${formatSize(-diff)} (${pct}%)`;
-  }
-  return 'Same size';
-}
+import { formatSize, formatSizeComparison } from '../utils/sizeUtils';
+import { getOutputFilename } from '../utils/filenameUtils';
 
 export default function CleanButton({ files }) {
   const [processing, setProcessing] = useState(false);
@@ -61,15 +39,7 @@ export default function CleanButton({ files }) {
           cleanedBlob = await stripFull(item.file);
         }
 
-        let outputName = item.file.name;
-        // If we converted to JPEG (from WebP, HEIC, etc.), update the extension
-        if (cleanedBlob.type === 'image/jpeg' && !/\.jpe?g$/i.test(outputName)) {
-          outputName = outputName.replace(/\.[^/.]+$/, '.jpg');
-        }
-        // If format preserved as WebP, ensure extension matches
-        if (cleanedBlob.type === 'image/webp' && !/\.webp$/i.test(outputName)) {
-          outputName = outputName.replace(/\.[^/.]+$/, '.webp');
-        }
+        const outputName = getOutputFilename(item.file.name, cleanedBlob.type);
 
         cleanedFiles.push({
           name: outputName,

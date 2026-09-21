@@ -8,3 +8,13 @@ export const VERDICTS = {
   POSSIBLE: 'possible',
   INCONCLUSIVE: 'inconclusive',
 };
+
+/**
+ * Determine whether credential details should be displayed.
+ * Only verified verdicts (verified-ai, verified-provenance) show credential details.
+ * @param {string|null|undefined} verdict
+ * @returns {boolean}
+ */
+export function shouldShowCredentials(verdict) {
+  return typeof verdict === 'string' && verdict.startsWith('verified');
+}

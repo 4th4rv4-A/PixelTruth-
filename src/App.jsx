@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { Toaster } from 'react-hot-toast';
 import toast from 'react-hot-toast';
 import Header from './components/Header';
@@ -20,17 +20,62 @@ export default function App() {
 
   // ─── Clean tab state (isolated) ──────────────────────
   const [cleanFiles, setCleanFiles] = useState([]);
+  const cleanFilesRef = useRef([]);
+  const cleanInFlightRef = useRef(0);
+
+  useEffect(() => {
+    cleanFilesRef.current = cleanFiles;
+  }, [cleanFiles]);
 
   // ─── Detect tab state (isolated) ─────────────────────
   const [detectFiles, setDetectFiles] = useState([]);
+  const detectFilesRef = useRef([]);
+  const detectInFlightRef = useRef(0);
+
+  useEffect(() => {
+    detectFilesRef.current = detectFiles;
+  }, [detectFiles]);
+
+  // Cleanup object URLs on unmount
+  useEffect(() => {
+    return () => {
+      cleanFilesRef.current.forEach((item) => {
+        if (item.thumbnailUrl) URL.revokeObjectURL(item.thumbnailUrl);
+      });
+      detectFilesRef.current.forEach((item) => {
+        if (item.thumbnailUrl) URL.revokeObjectURL(item.thumbnailUrl);
+      });
+    };
+  }, []);
 
   /* ════════════════════════════════════════════════════
    *  CLEAN TAB HANDLERS
    * ════════════════════════════════════════════════════ */
 
+  const reserveCleanSlots = useCallback((count) => {
+    const total = cleanFilesRef.current.length + cleanInFlightRef.current;
+    const available = Math.max(0, MAX_FILES - total);
+    const accepted = Math.min(count, available);
+    cleanInFlightRef.current += accepted;
+    return { accepted, available };
+  }, []);
+
+  const releaseCleanSlots = useCallback((count) => {
+    cleanInFlightRef.current = Math.max(0, cleanInFlightRef.current - count);
+  }, []);
+
   const handleCleanFilesAdded = useCallback(async (newFiles) => {
+    // Clamp to available slots in case called directly
+    const availableSlots = Math.max(0, MAX_FILES - cleanFilesRef.current.length);
+    const filesToAccept = newFiles.slice(0, availableSlots);
+
+    if (filesToAccept.length === 0) {
+      toast.error(`Maximum ${MAX_FILES} files allowed`);
+      return;
+    }
+
     const pendingItems = await Promise.all(
-      newFiles.map(async (file) => ({
+      filesToAccept.map(async (file) => ({
         id: `clean-${++fileIdCounter}`,
         file,
         thumbnailUrl: await createSafeThumbnail(file),
@@ -40,16 +85,16 @@ export default function App() {
       }))
     );
 
-    let allowedItems = [];
+    const allowedItems = pendingItems;
     setCleanFiles((prev) => {
-      const remaining = MAX_FILES - prev.length;
-      if (remaining <= 0) return prev;
-      allowedItems = pendingItems.slice(0, remaining);
-      // Revoke URLs for items that didn't make the cut to prevent leaks
-      pendingItems.slice(remaining).forEach((item) => {
+      const remaining = Math.max(0, MAX_FILES - prev.length);
+      const itemsToAdd = allowedItems.slice(0, remaining);
+      const dropped = allowedItems.slice(remaining);
+      dropped.forEach((item) => {
         if (item.thumbnailUrl) URL.revokeObjectURL(item.thumbnailUrl);
       });
-      return [...prev, ...allowedItems];
+      cleanInFlightRef.current = Math.max(0, cleanInFlightRef.current - filesToAccept.length);
+      return [...prev, ...itemsToAdd];
     });
 
     for (const item of allowedItems) {
@@ -95,9 +140,29 @@ export default function App() {
    *  DETECT TAB HANDLERS
    * ════════════════════════════════════════════════════ */
 
+  const reserveDetectSlots = useCallback((count) => {
+    const total = detectFilesRef.current.length + detectInFlightRef.current;
+    const available = Math.max(0, MAX_FILES - total);
+    const accepted = Math.min(count, available);
+    detectInFlightRef.current += accepted;
+    return { accepted, available };
+  }, []);
+
+  const releaseDetectSlots = useCallback((count) => {
+    detectInFlightRef.current = Math.max(0, detectInFlightRef.current - count);
+  }, []);
+
   const handleDetectFilesAdded = useCallback(async (newFiles) => {
+    const availableSlots = Math.max(0, MAX_FILES - detectFilesRef.current.length);
+    const filesToAccept = newFiles.slice(0, availableSlots);
+
+    if (filesToAccept.length === 0) {
+      toast.error(`Maximum ${MAX_FILES} files allowed`);
+      return;
+    }
+
     const pendingItems = await Promise.all(
-      newFiles.map(async (file) => ({
+      filesToAccept.map(async (file) => ({
         id: `detect-${++fileIdCounter}`,
         file,
         thumbnailUrl: await createSafeThumbnail(file),
@@ -105,21 +170,23 @@ export default function App() {
       }))
     );
 
-    let allowedItems = [];
+    const allowedItems = pendingItems;
     setDetectFiles((prev) => {
-      const remaining = MAX_FILES - prev.length;
-      if (remaining <= 0) return prev;
-      allowedItems = pendingItems.slice(0, remaining);
-      // Revoke URLs for items that didn't make the cut
-      pendingItems.slice(remaining).forEach((item) => {
+      const remaining = Math.max(0, MAX_FILES - prev.length);
+      const itemsToAdd = allowedItems.slice(0, remaining);
+      const dropped = allowedItems.slice(remaining);
+      dropped.forEach((item) => {
         if (item.thumbnailUrl) URL.revokeObjectURL(item.thumbnailUrl);
       });
-      return [...prev, ...allowedItems];
+      detectInFlightRef.current = Math.max(0, detectInFlightRef.current - filesToAccept.length);
+      return [...prev, ...itemsToAdd];
     });
 
     for (const item of allowedItems) {
+      console.log('[PixelTruth] Processing detect item:', item.id, item.file.name);
       try {
         const result = await detectAI(item.file);
+        console.log('[PixelTruth] Got detection result for:', item.id, result);
         setDetectFiles((prev) =>
           prev.map((f) => (f.id === item.id ? { ...f, result } : f))
         );
@@ -183,7 +250,12 @@ export default function App() {
               cleanFiles.forEach(f => { if (f.thumbnailUrl) URL.revokeObjectURL(f.thumbnailUrl); });
               setCleanFiles([]);
             }}>
-              <Dropzone files={cleanFiles} onFilesAdded={handleCleanFilesAdded} />
+              <Dropzone
+                files={cleanFiles}
+                onFilesAdded={handleCleanFilesAdded}
+                onReserveSlots={reserveCleanSlots}
+                onReleaseSlots={releaseCleanSlots}
+              />
 
               <FileQueue
                 files={cleanFiles}
@@ -213,7 +285,12 @@ export default function App() {
               detectFiles.forEach(f => { if (f.thumbnailUrl) URL.revokeObjectURL(f.thumbnailUrl); });
               setDetectFiles([]);
             }}>
-              <DetectDropzone files={detectFiles} onFilesAdded={handleDetectFilesAdded} />
+              <DetectDropzone
+                files={detectFiles}
+                onFilesAdded={handleDetectFilesAdded}
+                onReserveSlots={reserveDetectSlots}
+                onReleaseSlots={releaseDetectSlots}
+              />
 
               {/* Detect results */}
               {detectFiles.length > 0 && (

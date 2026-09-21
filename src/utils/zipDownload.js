@@ -7,7 +7,7 @@ import { saveAs } from 'file-saver';
  * @param {Set<string>} usedNames - set of already-used names (mutated)
  * @returns {string} unique filename
  */
-function deduplicateName(name, usedNames) {
+export function deduplicateName(name, usedNames) {
   if (!usedNames.has(name)) {
     usedNames.add(name);
     return name;

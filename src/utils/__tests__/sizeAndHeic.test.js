@@ -1,28 +1,18 @@
 import { describe, it, expect } from 'vitest';
+import {
+  formatSize,
+  formatSizeComparison,
+  calculateSizeChange,
+} from '../sizeUtils';
+import {
+  isHeic,
+  getOutputFilename,
+  resolveOutputExtension,
+} from '../filenameUtils';
 
 /**
- * Size comparison formatting tests.
- * Re-implements the formatting logic from CleanButton.jsx for unit testing.
+ * Size comparison formatting tests using imported production sizeUtils.
  */
-
-function formatSize(bytes) {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
-}
-
-function formatSizeComparison(original, cleaned) {
-  const diff = original - cleaned;
-  const pct = ((Math.abs(diff) / original) * 100).toFixed(1);
-
-  if (diff > 0) {
-    return `Saved ${formatSize(diff)} (${pct}%)`;
-  } else if (diff < 0) {
-    return `Increased by ${formatSize(-diff)} (${pct}%)`;
-  }
-  return 'Same size';
-}
-
 describe('formatSize', () => {
   it('formats bytes', () => {
     expect(formatSize(512)).toBe('512 B');
@@ -34,6 +24,29 @@ describe('formatSize', () => {
 
   it('formats megabytes', () => {
     expect(formatSize(5 * 1024 * 1024)).toBe('5.00 MB');
+  });
+});
+
+describe('calculateSizeChange', () => {
+  it('correctly reports size savings', () => {
+    const change = calculateSizeChange(1000, 800);
+    expect(change.diff).toBe(200);
+    expect(change.pct).toBe('20.0');
+    expect(change.isSaved).toBe(true);
+    expect(change.isIncreased).toBe(false);
+  });
+
+  it('correctly reports size increases', () => {
+    const change = calculateSizeChange(1000, 1200);
+    expect(change.diff).toBe(-200);
+    expect(change.pct).toBe('20.0');
+    expect(change.isSaved).toBe(false);
+    expect(change.isIncreased).toBe(true);
+  });
+
+  it('handles zero original size safely without division by zero', () => {
+    const change = calculateSizeChange(0, 500);
+    expect(change.pct).toBe('0.0');
   });
 });
 
@@ -69,31 +82,80 @@ describe('formatSizeComparison', () => {
 });
 
 /**
- * HEIC conversion path tests.
- *
- * These test the HEIC detection and output naming logic
- * to verify the clean architecture:
- * - Detect uses ORIGINAL HEIC
- * - Clean converts to JPEG only at clean time
- * - Output has .jpg extension
+ * MIME to extension resolution tests using imported production filenameUtils.
  */
-describe('HEIC output naming', () => {
-  function isHeic(file) {
-    return (
-      file.type === 'image/heic' ||
-      file.type === 'image/heif' ||
-      /\.hei[cf]$/i.test(file.name)
-    );
-  }
+describe('resolveOutputExtension', () => {
+  it('maps image/jpeg to .jpg', () => {
+    expect(resolveOutputExtension('image/jpeg')).toBe('.jpg');
+  });
 
-  function getOutputName(originalName, cleanedMimeType) {
-    let outputName = originalName;
-    if (cleanedMimeType === 'image/jpeg' && !/\.jpe?g$/i.test(outputName)) {
-      outputName = outputName.replace(/\.[^/.]+$/, '.jpg');
-    }
-    return outputName;
-  }
+  it('maps image/png to .png', () => {
+    expect(resolveOutputExtension('image/png')).toBe('.png');
+  });
 
+  it('maps image/webp to .webp', () => {
+    expect(resolveOutputExtension('image/webp')).toBe('.webp');
+  });
+
+  it('throws error for unknown or unsupported MIME types', () => {
+    expect(() => resolveOutputExtension('image/gif')).toThrow(/Unsupported output format/);
+    expect(() => resolveOutputExtension('application/pdf')).toThrow(/Unsupported output format/);
+    expect(() => resolveOutputExtension('')).toThrow(/Invalid or missing MIME type/);
+    expect(() => resolveOutputExtension(null)).toThrow(/Invalid or missing MIME type/);
+  });
+});
+
+/**
+ * Output filename formatting tests using imported production filenameUtils.
+ */
+describe('getOutputFilename', () => {
+  it('converts .heic extension to .jpg when output is JPEG', () => {
+    expect(getOutputFilename('photo.heic', 'image/jpeg')).toBe('photo.jpg');
+  });
+
+  it('converts .HEIC extension to .jpg when output is JPEG', () => {
+    expect(getOutputFilename('photo.HEIC', 'image/jpeg')).toBe('photo.jpg');
+  });
+
+  it('converts .heif extension to .jpg when output is JPEG', () => {
+    expect(getOutputFilename('photo.heif', 'image/jpeg')).toBe('photo.jpg');
+  });
+
+  it('preserves .jpg output name for JPEG input', () => {
+    expect(getOutputFilename('photo.jpg', 'image/jpeg')).toBe('photo.jpg');
+  });
+
+  it('normalizes .jpeg input to .jpg output', () => {
+    expect(getOutputFilename('photo.jpeg', 'image/jpeg')).toBe('photo.jpg');
+  });
+
+  it('converts .webp to .jpg when output is JPEG', () => {
+    expect(getOutputFilename('photo.webp', 'image/jpeg')).toBe('photo.jpg');
+  });
+
+  it('preserves .webp when output is WebP', () => {
+    expect(getOutputFilename('photo.webp', 'image/webp')).toBe('photo.webp');
+  });
+
+  it('handles filename with no extension by appending correct extension', () => {
+    expect(getOutputFilename('unnamed_photo', 'image/jpeg')).toBe('unnamed_photo.jpg');
+    expect(getOutputFilename('unnamed_photo', 'image/png')).toBe('unnamed_photo.png');
+    expect(getOutputFilename('unnamed_photo', 'image/webp')).toBe('unnamed_photo.webp');
+  });
+
+  it('handles filenames with multiple dots', () => {
+    expect(getOutputFilename('my.holiday.photo.2024.heic', 'image/jpeg')).toBe('my.holiday.photo.2024.jpg');
+  });
+
+  it('throws on unsupported output MIME type to prevent corrupted file naming', () => {
+    expect(() => getOutputFilename('photo.jpg', 'image/tiff')).toThrow();
+  });
+});
+
+/**
+ * HEIC detection tests using imported production filenameUtils.
+ */
+describe('isHeic', () => {
   it('detects HEIC by MIME type', () => {
     expect(isHeic({ type: 'image/heic', name: 'photo.heic' })).toBe(true);
   });
@@ -106,31 +168,21 @@ describe('HEIC output naming', () => {
     expect(isHeic({ type: '', name: 'photo.heic' })).toBe(true);
   });
 
+  it('detects HEIF by extension when MIME is empty', () => {
+    expect(isHeic({ type: '', name: 'photo.heif' })).toBe(true);
+  });
+
   it('does not falsely detect JPEG as HEIC', () => {
     expect(isHeic({ type: 'image/jpeg', name: 'photo.jpg' })).toBe(false);
   });
 
-  it('converts .heic extension to .jpg in output name', () => {
-    expect(getOutputName('photo.heic', 'image/jpeg')).toBe('photo.jpg');
+  it('does not falsely detect PNG or WebP as HEIC', () => {
+    expect(isHeic({ type: 'image/png', name: 'image.png' })).toBe(false);
+    expect(isHeic({ type: 'image/webp', name: 'image.webp' })).toBe(false);
   });
 
-  it('converts .HEIC extension to .jpg in output name', () => {
-    expect(getOutputName('photo.HEIC', 'image/jpeg')).toBe('photo.jpg');
-  });
-
-  it('converts .heif extension to .jpg in output name', () => {
-    expect(getOutputName('photo.heif', 'image/jpeg')).toBe('photo.jpg');
-  });
-
-  it('does not change .jpg output name for JPEG input', () => {
-    expect(getOutputName('photo.jpg', 'image/jpeg')).toBe('photo.jpg');
-  });
-
-  it('converts .webp to .jpg when output is JPEG', () => {
-    expect(getOutputName('photo.webp', 'image/jpeg')).toBe('photo.jpg');
-  });
-
-  it('preserves .webp when output is WebP', () => {
-    expect(getOutputName('photo.webp', 'image/webp')).toBe('photo.webp');
+  it('handles null or empty file safely', () => {
+    expect(isHeic(null)).toBe(false);
+    expect(isHeic({})).toBe(false);
   });
 });

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { VERDICTS } from '../verdicts';
+import { VERDICTS, shouldShowCredentials } from '../verdicts';
+import { determineVerdict, isValidationVerified } from '../detectAI';
 
 describe('VERDICTS constants', () => {
   it('has all expected verdict values', () => {
@@ -20,31 +21,30 @@ describe('VERDICTS constants', () => {
   });
 });
 
+describe('isValidationVerified production helper', () => {
+  it('returns true only for "Valid" or "Trusted"', () => {
+    expect(isValidationVerified('Valid')).toBe(true);
+    expect(isValidationVerified('Trusted')).toBe(true);
+    expect(isValidationVerified('Invalid')).toBe(false);
+    expect(isValidationVerified(null)).toBe(false);
+    expect(isValidationVerified(undefined)).toBe(false);
+    expect(isValidationVerified('Unknown')).toBe(false);
+  });
+});
+
 /**
  * C2PA Validation State Machine Tests
  *
- * These tests validate the verdict decision logic against
- * the expected state machine:
+ * These tests validate the imported production determineVerdict function
+ * against the expected semantic model:
  *
- * manifest absent                              → inconclusive
- * manifest present + validation invalid        → inconclusive
- * manifest present + validation valid + AI     → verified-ai
- * manifest present + validation valid + no AI  → verified-provenance
- * manifest present + validation unavailable    → inconclusive (no crypto claim)
+ * Case A: manifest absent                              → inconclusive (or possible if software tag matches)
+ * Case B: manifest present + validation invalid        → inconclusive
+ * Case C: manifest present + validation valid + AI     → verified-ai
+ * Case D: manifest present + validation valid + no AI  → verified-provenance
+ * Case E: manifest present + validation unavailable    → inconclusive (no crypto claim)
  */
-describe('Verdict state machine logic', () => {
-  /**
-   * Helper that simulates the verdict decision logic from detectAI.js
-   * without requiring actual C2PA library calls.
-   */
-  function determineVerdict({ hasManifest, validationState, hasAiMarker }) {
-    if (!hasManifest) return VERDICTS.INCONCLUSIVE;
-
-    const isVerified = validationState === 'Valid' || validationState === 'Trusted';
-    if (!isVerified) return VERDICTS.INCONCLUSIVE;
-
-    return hasAiMarker ? VERDICTS.VERIFIED_AI : VERDICTS.VERIFIED_PROVENANCE;
-  }
+describe('Verdict state machine logic (imported production function)', () => {
 
   it('returns inconclusive when no manifest is found', () => {
     expect(determineVerdict({
@@ -122,11 +122,7 @@ describe('Verdict state machine logic', () => {
 /**
  * Credential details visibility tests
  */
-describe('Credential details visibility', () => {
-  function shouldShowCredentials(verdict) {
-    return verdict?.startsWith('verified') ?? false;
-  }
-
+describe('Credential details visibility (imported shouldShowCredentials)', () => {
   it('shows for verified-ai', () => {
     expect(shouldShowCredentials(VERDICTS.VERIFIED_AI)).toBe(true);
   });

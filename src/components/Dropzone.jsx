@@ -8,27 +8,43 @@ import {
   MAX_FILES,
 } from '../utils/normalizeInput';
 
-export default function Dropzone({ files, onFilesAdded }) {
+export default function Dropzone({ files, onFilesAdded, onReserveSlots, onReleaseSlots }) {
   const inputRef = useRef(null);
   const dropRef = useRef(null);
 
+  const reserve = useCallback(
+    (count) => {
+      if (onReserveSlots) return onReserveSlots(count);
+      const remaining = Math.max(0, MAX_FILES - files.length);
+      return { accepted: Math.min(count, remaining), available: remaining };
+    },
+    [files.length, onReserveSlots]
+  );
+
+  const release = useCallback(
+    (count) => {
+      if (onReleaseSlots) onReleaseSlots(count);
+    },
+    [onReleaseSlots]
+  );
+
   const processFiles = useCallback(
     async (rawFiles) => {
-      const currentCount = files.length;
-      const remaining = MAX_FILES - currentCount;
+      const rawList = Array.from(rawFiles);
+      const { accepted } = reserve(rawList.length);
 
-      if (remaining <= 0) {
+      if (accepted <= 0) {
         toast.error(`Maximum ${MAX_FILES} files allowed`);
         return;
       }
 
-      const toProcess = Array.from(rawFiles).slice(0, remaining);
-      if (toProcess.length < rawFiles.length) {
-        toast(`Only ${remaining} more file${remaining === 1 ? '' : 's'} can be added`, {
+      if (accepted < rawList.length) {
+        toast(`Only ${accepted} more file${accepted === 1 ? '' : 's'} can be added`, {
           icon: '⚠️',
         });
       }
 
+      const toProcess = rawList.slice(0, accepted);
       const validFiles = [];
 
       for (const file of toProcess) {
@@ -36,12 +52,14 @@ export default function Dropzone({ files, onFilesAdded }) {
         const typeOk = ACCEPTED_TYPES.includes(file.type) || ACCEPTED_EXTENSIONS.test(file.name);
         if (!typeOk) {
           toast.error(`"${file.name}" — unsupported format. Use JPEG, PNG, WebP, or HEIC.`);
+          release(1);
           continue;
         }
 
         // Size check
         if (file.size > MAX_FILE_SIZE) {
           toast.error(`"${file.name}" exceeds 50 MB limit`);
+          release(1);
           continue;
         }
 
@@ -53,6 +71,7 @@ export default function Dropzone({ files, onFilesAdded }) {
           } else {
             toast.error(`"${file.name}" is too large or its dimensions couldn't be verified safely.`);
           }
+          release(1);
           continue;
         }
 
@@ -64,7 +83,7 @@ export default function Dropzone({ files, onFilesAdded }) {
         onFilesAdded(validFiles);
       }
     },
-    [files.length, onFilesAdded]
+    [reserve, release, onFilesAdded]
   );
 
   // Drag & drop handlers

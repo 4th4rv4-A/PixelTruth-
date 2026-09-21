@@ -1,31 +1,7 @@
 import { describe, it, expect } from 'vitest';
+import { deduplicateName } from '../zipDownload';
 
-/**
- * Tests for the filename deduplication logic used in zipDownload.js.
- * We re-implement the pure function here to test without JSZip dependency.
- */
-function deduplicateName(name, usedNames) {
-  if (!usedNames.has(name)) {
-    usedNames.add(name);
-    return name;
-  }
-
-  const dotIndex = name.lastIndexOf('.');
-  const base = dotIndex !== -1 ? name.slice(0, dotIndex) : name;
-  const ext = dotIndex !== -1 ? name.slice(dotIndex) : '';
-
-  let counter = 2;
-  let candidate = `${base}-${counter}${ext}`;
-  while (usedNames.has(candidate)) {
-    counter++;
-    candidate = `${base}-${counter}${ext}`;
-  }
-
-  usedNames.add(candidate);
-  return candidate;
-}
-
-describe('deduplicateName', () => {
+describe('deduplicateName (imported production function)', () => {
   it('returns original name when no collision', () => {
     const used = new Set();
     expect(deduplicateName('photo.jpg', used)).toBe('photo.jpg');
@@ -70,12 +46,30 @@ describe('deduplicateName', () => {
   it('handles unicode filenames', () => {
     const used = new Set(['写真.jpg']);
     expect(deduplicateName('写真.jpg', used)).toBe('写真-2.jpg');
+    expect(deduplicateName('사진.png', used)).toBe('사진.png');
+    expect(deduplicateName('사진.png', used)).toBe('사진-2.png');
+    expect(deduplicateName('🌟.webp', used)).toBe('🌟.webp');
+    expect(deduplicateName('🌟.webp', used)).toBe('🌟-2.webp');
   });
 
   it('handles filenames already ending in -2', () => {
     const used = new Set(['photo-2.jpg']);
-    // A different file that happens to be named photo-2.jpg
     expect(deduplicateName('photo-2.jpg', used)).toBe('photo-2-2.jpg');
+  });
+
+  it('handles repeated identical names without collision corruption', () => {
+    const used = new Set();
+    const results = [];
+    for (let i = 0; i < 5; i++) {
+      results.push(deduplicateName('duplicate.jpg', used));
+    }
+    expect(results).toEqual([
+      'duplicate.jpg',
+      'duplicate-2.jpg',
+      'duplicate-3.jpg',
+      'duplicate-4.jpg',
+      'duplicate-5.jpg',
+    ]);
   });
 
   it('does not mutate names of non-colliding files', () => {
