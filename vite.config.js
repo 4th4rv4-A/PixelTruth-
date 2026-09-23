@@ -9,7 +9,7 @@ export default defineConfig({
     react(),
     tailwindcss(),
     VitePWA({
-      registerType: 'autoUpdate',
+      registerType: 'prompt',
       includeAssets: ['favicon.svg', 'icons.svg'],
       manifest: {
         name: 'PixelTruth — Image Metadata Cleaner & AI Detector',
@@ -29,9 +29,12 @@ export default defineConfig({
         // Precache app shell; C2PA WASM chunk should stay lazy-loaded, not precached,
         // since most users only ever use the Clean tab
         globPatterns: ['**/*.{js,css,html,svg,png}'],
-        globIgnores: ['**/inline-*.js'],
+        globIgnores: ['**/inline-*.js', '**/c2pa.worker-*.js', '**/ai.worker-*.js', '**/*.wasm'],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
       },
     }),
   ],
+  test: {
+    exclude: ['node_modules', 'dist', 'tests/e2e/**'],
+  }
 })

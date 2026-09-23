@@ -28,3 +28,8 @@ dist-ssr
 coverage/
 .env
 .env.*
+
+# Generated test fixtures
+tests/fixtures/generated/
+playwright-report/
+test-results/

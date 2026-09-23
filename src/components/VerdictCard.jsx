@@ -1,4 +1,6 @@
 import CredentialDetails from './CredentialDetails';
+import AiAnalysisButton from './AiAnalysisButton';
+import { OVERALL_ASSESSMENTS } from '../utils/aggregator';
 
 export default function VerdictCard({ item }) {
   const { file, thumbnailUrl, result } = item;
@@ -24,7 +26,7 @@ export default function VerdictCard({ item }) {
   }
 
   const configs = {
-    'verified-ai': {
+    [OVERALL_ASSESSMENTS.VERIFIED_SIGNED_AI_PROVENANCE]: {
       borderColor: 'border-l-develop-500',
       badgeText: 'text-develop-600 dark:text-develop-400',
       icon: (
@@ -33,11 +35,9 @@ export default function VerdictCard({ item }) {
           <path d="m9 12 2 2 4-4" />
         </svg>
       ),
-      title: 'Verified AI-Generated',
-      getDescription: (r) =>
-        `This image has a verified Content Credential from ${r.issuer}, indicating it was generated or modified by ${r.generator}.`,
+      title: 'Signed AI Provenance Detected'
     },
-    'verified-provenance': {
+    [OVERALL_ASSESSMENTS.TRUSTED_PROVENANCE_NO_AI_ASSERTION]: {
       borderColor: 'border-l-develop-400',
       badgeText: 'text-develop-600 dark:text-develop-400',
       icon: (
@@ -46,11 +46,9 @@ export default function VerdictCard({ item }) {
           <polyline points="9 11 12 14 22 4" />
         </svg>
       ),
-      title: 'Content Credential Found — No AI Marker',
-      getDescription: (r) =>
-        `A provenance credential was found from ${r.issuer} (${r.generator}), but no AI-generation marker was identified in the available credential. This does not prove that the image is non-synthetic.`,
+      title: 'Trusted Provenance (No AI Assertion)'
     },
-    possible: {
+    [OVERALL_ASSESSMENTS.AI_TOOL_INDICATOR]: {
       borderColor: 'border-l-warn-500',
       badgeText: 'text-warn-600 dark:text-warn-400',
       icon: (
@@ -60,11 +58,32 @@ export default function VerdictCard({ item }) {
           <line x1="12" y1="17" x2="12.01" y2="17" />
         </svg>
       ),
-      title: 'Possible AI markers found',
-      getDescription: (r) =>
-        `Software metadata mentions "${r.tag}", but this isn't a verified credential and could be edited or spoofed.`,
+      title: 'Unverified AI Indicators Detected'
     },
-    inconclusive: {
+    [OVERALL_ASSESSMENTS.MULTIPLE_SYNTHETIC_SIGNALS]: {
+      borderColor: 'border-l-warn-600',
+      badgeText: 'text-warn-600 dark:text-warn-400',
+      icon: (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-warn-500">
+          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+          <line x1="12" y1="9" x2="12" y2="13" />
+          <line x1="12" y1="17" x2="12.01" y2="17" />
+        </svg>
+      ),
+      title: 'Multiple Synthetic Signals'
+    },
+    [OVERALL_ASSESSMENTS.NO_SIGNIFICANT_SIGNAL]: {
+      borderColor: 'border-l-safelight-500',
+      badgeText: 'text-safelight-600 dark:text-safelight-400',
+      icon: (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-safelight-500">
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+          <polyline points="22 4 12 14.01 9 11.01" />
+        </svg>
+      ),
+      title: 'No Synthetic Signals Detected'
+    },
+    [OVERALL_ASSESSMENTS.INCONCLUSIVE]: {
       borderColor: 'border-l-ink-400',
       badgeText: 'text-ink-600 dark:text-ink-400',
       icon: (
@@ -74,14 +93,11 @@ export default function VerdictCard({ item }) {
           <line x1="12" y1="17" x2="12.01" y2="17" />
         </svg>
       ),
-      title: (r) => r.validationNote ? 'Unverified Content Credential' : 'No AI markers detected',
-      getDescription: (r) =>
-        r.validationNote ||
-        'No C2PA credential or generator tag found. This does not confirm the image is real — metadata may have been stripped or was never present.',
-    },
+      title: 'Inconclusive or Unverified'
+    }
   };
 
-  const config = configs[result.verdict] || configs.inconclusive;
+  const config = configs[result.overallAssessment] || configs[OVERALL_ASSESSMENTS.INCONCLUSIVE];
 
   return (
     <div className={`frame relative overflow-hidden border-l-4 ${config.borderColor} animate-fade-in-up`}>
@@ -107,25 +123,29 @@ export default function VerdictCard({ item }) {
               </h3>
             </div>
 
-            {/* Description */}
+            {/* Description / Human Reasoning */}
             <p className="text-sm text-ink-600 dark:text-ink-400 leading-relaxed">
-              {config.getDescription(result)}
+              {result.humanReasoning}
             </p>
 
-            {/* Extra details for possible verdict */}
-            {result.verdict === 'possible' && result.raw && (
-              <div className="mt-3 px-3 py-2 rounded-sm bg-ink-100 dark:bg-ink-800 text-xs font-mono text-ink-500 dark:text-ink-400">
-                Raw metadata: {result.raw}
+            {result.metadataSignals?.map((sig, i) => (
+              <div key={i} className="mt-3 px-3 py-2 rounded-sm bg-ink-100 dark:bg-ink-800 text-xs font-mono text-ink-500 dark:text-ink-400">
+                {sig.type}: {sig.description}
               </div>
-            )}
+            ))}
           </div>
         </div>
       </div>
 
       {/* Credential details for verified results */}
-      {result.verdict?.startsWith('verified') && (
-        <CredentialDetails result={result} />
+      {result.rawResult && (result.overallAssessment === OVERALL_ASSESSMENTS.VERIFIED_SIGNED_AI_PROVENANCE || result.overallAssessment === OVERALL_ASSESSMENTS.TRUSTED_PROVENANCE_NO_AI_ASSERTION) && (
+        <CredentialDetails result={result.rawResult} />
       )}
+
+      {/* Optional AI Analysis */}
+      <div className="px-5 pb-5">
+        <AiAnalysisButton file={file} />
+      </div>
     </div>
   );
 }

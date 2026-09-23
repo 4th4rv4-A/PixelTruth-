@@ -7,17 +7,28 @@ import { getOutputFilename } from '../utils/filenameUtils';
 
 export default function CleanButton({ files }) {
   const [processing, setProcessing] = useState(false);
-  const [progress, setProgress] = useState({ current: 0, total: 0 });
+  const [progress, setProgress] = useState({ current: 0, total: 0, stage: '' });
   const [sizeReport, setSizeReport] = useState(null);
+  const abortControllerRef = useRef(null);
 
   if (files.length === 0) return null;
 
   const isBulk = files.length > 1;
 
   const handleClean = async () => {
+    if (processing) {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      return;
+    }
+
     setProcessing(true);
     setSizeReport(null);
-    setProgress({ current: 0, total: files.length });
+    setProgress({ current: 0, total: files.length, stage: 'STARTING' });
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
 
     const cleanedFiles = [];
     const sizeEntries = [];
@@ -30,13 +41,15 @@ export default function CleanButton({ files }) {
       try {
         let cleanedBlob;
         const isJpeg = item.file.type === 'image/jpeg';
+        
+        const onProgress = (data) => {
+          setProgress({ current: i + 1, total: files.length, stage: data.stage });
+        };
 
         if (isJpeg && item.keepTags.length > 0) {
-          // Selective strip for JPEG with kept tags
-          cleanedBlob = await stripSelective(item.file, item.keepTags);
+          cleanedBlob = await stripSelective(item.file, item.keepTags, onProgress, controller.signal);
         } else {
-          // Full strip for everything else (or JPEG with nothing to keep)
-          cleanedBlob = await stripFull(item.file);
+          cleanedBlob = await stripFull(item.file, onProgress, controller.signal);
         }
 
         const outputName = getOutputFilename(item.file.name, cleanedBlob.type);
@@ -52,6 +65,9 @@ export default function CleanButton({ files }) {
           cleanedSize: cleanedBlob.size,
         });
       } catch (err) {
+        if (err.message === 'CANCELLED' || err.message === 'TIMEOUT') {
+          break; // Stop processing the rest of the files if cancelled/timeout
+        }
         errorCount++;
         toast.error(`Failed to clean "${item.file.name}": ${err.message || 'Unknown error'}`);
         console.error('Clean failed for', item.file.name, err);
@@ -80,7 +96,9 @@ export default function CleanButton({ files }) {
       }
     }
 
-    if (errorCount > 0 && cleanedFiles.length > 0) {
+    if (controller.signal.aborted) {
+      toast('Processing cancelled', { icon: '🛑' });
+    } else if (errorCount > 0 && cleanedFiles.length > 0) {
       toast(`${cleanedFiles.length} file${cleanedFiles.length === 1 ? '' : 's'} cleaned, ${errorCount} failed`, {
         icon: '⚠️',
       });
@@ -91,7 +109,8 @@ export default function CleanButton({ files }) {
     }
 
     setProcessing(false);
-    setProgress({ current: 0, total: 0 });
+    setProgress({ current: 0, total: 0, stage: '' });
+    abortControllerRef.current = null;
   };
 
   return (
@@ -117,7 +136,10 @@ export default function CleanButton({ files }) {
             <>
               <span className="w-5 h-5 rounded-full border-2 border-white/30 border-t-white animate-spin" />
               <span>
-                Processing {progress.current} of {progress.total}…
+                {progress.stage || 'PROCESSING'} {progress.current} of {progress.total}
+              </span>
+              <span className="absolute right-6 text-xs bg-black/20 hover:bg-black/40 px-2 py-1 rounded cursor-pointer transition-colors">
+                Cancel
               </span>
             </>
           ) : (

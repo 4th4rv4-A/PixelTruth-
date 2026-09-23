@@ -9,9 +9,10 @@ import DetectDropzone from './components/DetectDropzone';
 import VerdictCard from './components/VerdictCard';
 import InstallPrompt from './components/InstallPrompt';
 import ErrorBoundary from './components/ErrorBoundary';
-import { readMetadata, getPrivacyLevel } from './utils/readMetadata';
 import { detectAI } from './utils/detectAI';
 import { createSafeThumbnail, MAX_FILES } from './utils/normalizeInput';
+import InspectorView from './components/InspectorView';
+import WorkspaceView from './components/WorkspaceView';
 
 let fileIdCounter = 0;
 
@@ -36,8 +37,15 @@ export default function App() {
     detectFilesRef.current = detectFiles;
   }, [detectFiles]);
 
-  // Cleanup object URLs on unmount
+  // ─── Inspect tab state (isolated) ────────────────────
+  const [inspectFile, setInspectFile] = useState(null);
+
+  // Controllers for background tasks
+  const abortControllersRef = useRef(new Map());
+
+  // Cleanup object URLs and pending tasks on unmount
   useEffect(() => {
+    const controllers = abortControllersRef.current;
     return () => {
       cleanFilesRef.current.forEach((item) => {
         if (item.thumbnailUrl) URL.revokeObjectURL(item.thumbnailUrl);
@@ -45,6 +53,10 @@ export default function App() {
       detectFilesRef.current.forEach((item) => {
         if (item.thumbnailUrl) URL.revokeObjectURL(item.thumbnailUrl);
       });
+      for (const controller of controllers.values()) {
+        controller.abort();
+      }
+      controllers.clear();
     };
   }, []);
 
@@ -98,25 +110,40 @@ export default function App() {
     });
 
     for (const item of allowedItems) {
+      const controller = new AbortController();
+      abortControllersRef.current.set(item.id, controller);
+      
       try {
-        const metadata = await readMetadata(item.file);
+        const metadata = await readMetadata(item.file, controller.signal);
         const privacyLevel = getPrivacyLevel(metadata);
+        
         setCleanFiles((prev) =>
           prev.map((f) =>
             f.id === item.id ? { ...f, metadata, privacyLevel } : f
           )
         );
-      } catch {
-        setCleanFiles((prev) =>
-          prev.map((f) =>
-            f.id === item.id ? { ...f, metadata: {}, privacyLevel: 'low' } : f
-          )
-        );
+      } catch (err) {
+        if (err.message !== 'CANCELLED') {
+          setCleanFiles((prev) =>
+            prev.map((f) =>
+              f.id === item.id ? { ...f, metadata: {}, privacyLevel: 'low' } : f
+            )
+          );
+        }
+      } finally {
+        abortControllersRef.current.delete(item.id);
       }
     }
   }, []);
 
   const handleCleanRemoveFile = useCallback((id) => {
+    // Abort if currently processing
+    const controller = abortControllersRef.current.get(id);
+    if (controller) {
+      controller.abort();
+      abortControllersRef.current.delete(id);
+    }
+    
     setCleanFiles((prev) => {
       const item = prev.find((f) => f.id === id);
       if (item?.thumbnailUrl) URL.revokeObjectURL(item.thumbnailUrl);
@@ -183,28 +210,38 @@ export default function App() {
     });
 
     for (const item of allowedItems) {
-      console.log('[PixelTruth] Processing detect item:', item.id, item.file.name);
+      const controller = new AbortController();
+      abortControllersRef.current.set(item.id, controller);
+
       try {
-        const result = await detectAI(item.file);
-        console.log('[PixelTruth] Got detection result for:', item.id, result);
+        const result = await detectAI(item.file, controller.signal);
         setDetectFiles((prev) =>
           prev.map((f) => (f.id === item.id ? { ...f, result } : f))
         );
       } catch (err) {
-        console.error('Detection failed for', item.file.name, err);
-        toast.error(`Detection failed for "${item.file.name}": ${err.message || 'Unknown error'}`);
-        setDetectFiles((prev) =>
-          prev.map((f) =>
-            f.id === item.id
-              ? { ...f, result: { verdict: 'inconclusive' } }
-              : f
-          )
-        );
+        if (err.message !== 'CANCELLED') {
+          toast.error(`Detection failed for "${item.file.name}": ${err.message || 'Unknown error'}`);
+          setDetectFiles((prev) =>
+            prev.map((f) =>
+              f.id === item.id
+                ? { ...f, result: { verdict: 'inconclusive' } }
+                : f
+            )
+          );
+        }
+      } finally {
+        abortControllersRef.current.delete(item.id);
       }
     }
   }, []);
 
   const handleDetectRemoveFile = useCallback((id) => {
+    const controller = abortControllersRef.current.get(id);
+    if (controller) {
+      controller.abort();
+      abortControllersRef.current.delete(id);
+    }
+
     setDetectFiles((prev) => {
       const item = prev.find((f) => f.id === id);
       if (item?.thumbnailUrl) URL.revokeObjectURL(item.thumbnailUrl);
@@ -337,6 +374,52 @@ export default function App() {
               )}
             </ErrorBoundary>
           </>
+        )}
+
+        {/* ═══ INSPECT TAB ═══ */}
+        {activeTab === 'inspect' && (
+          <>
+            <div className="text-center space-y-2 mb-2">
+              <h2 className="text-2xl sm:text-3xl font-bold text-surface-900 dark:text-white">
+                Forensic Inspector
+              </h2>
+              <p className="text-surface-500 dark:text-surface-400 max-w-lg mx-auto">
+                Deep dive into the binary structure, metadata ledger, and cryptographic provenance of your image. Advanced analysis only.
+              </p>
+            </div>
+
+            <ErrorBoundary onReset={() => setInspectFile(null)}>
+              {!inspectFile ? (
+                <Dropzone
+                  files={[]}
+                  onFilesAdded={(newFiles) => {
+                    if (newFiles.length > 0) setInspectFile(newFiles[0]);
+                  }}
+                  onReserveSlots={() => ({ accepted: 1, available: 1 })}
+                  onReleaseSlots={() => {}}
+                />
+              ) : (
+                <div className="space-y-4">
+                  <div className="flex justify-end">
+                    <button
+                      onClick={() => setInspectFile(null)}
+                      className="px-4 py-2 bg-surface-800 hover:bg-surface-700 text-surface-200 rounded-lg text-sm font-medium transition-colors"
+                    >
+                      Inspect Another File
+                    </button>
+                  </div>
+                  <InspectorView file={inspectFile} />
+                </div>
+              )}
+            </ErrorBoundary>
+          </>
+        )}
+
+        {/* ═══ WORKSPACE TAB ═══ */}
+        {activeTab === 'workspace' && (
+          <ErrorBoundary onReset={() => setActiveTab('clean')}>
+            <WorkspaceView />
+          </ErrorBoundary>
         )}
 
         {/* Footer */}

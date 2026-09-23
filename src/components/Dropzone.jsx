@@ -1,10 +1,7 @@
 import { useCallback, useRef, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import {
-  inspectDimensions,
-  ACCEPTED_TYPES,
-  ACCEPTED_EXTENSIONS,
-  MAX_FILE_SIZE,
+  validateFile,
   MAX_FILES,
 } from '../utils/normalizeInput';
 
@@ -48,29 +45,20 @@ export default function Dropzone({ files, onFilesAdded, onReserveSlots, onReleas
       const validFiles = [];
 
       for (const file of toProcess) {
-        // Type check
-        const typeOk = ACCEPTED_TYPES.includes(file.type) || ACCEPTED_EXTENSIONS.test(file.name);
-        if (!typeOk) {
-          toast.error(`"${file.name}" — unsupported format. Use JPEG, PNG, WebP, or HEIC.`);
-          release(1);
-          continue;
-        }
-
-        // Size check
-        if (file.size > MAX_FILE_SIZE) {
-          toast.error(`"${file.name}" exceeds 50 MB limit`);
-          release(1);
-          continue;
-        }
-
-        // Dimensions check
-        const dimResult = await inspectDimensions(file);
-        if (!dimResult.safe) {
-          if (dimResult.reason === 'oversized') {
-            toast.error(`"${file.name}" dimensions are too large (exceeds 64MP safe limit)`);
-          } else {
-            toast.error(`"${file.name}" is too large or its dimensions couldn't be verified safely.`);
-          }
+        // Validation pipeline
+        const result = await validateFile(file);
+        
+        if (!result.valid) {
+          const reason = result.reasons[0];
+          if (reason === 'FILE_TOO_LARGE') toast.error(`"${file.name}" exceeds 50 MB limit`);
+          else if (reason === 'INVALID_SIGNATURE') toast.error(`"${file.name}" — unsupported format. Use JPEG, PNG, WebP, or HEIC.`);
+          else if (reason === 'UNSUPPORTED_FORMAT') toast.error(`"${file.name}" is an unsupported format.`);
+          else if (reason === 'DIMENSIONS_UNKNOWN') toast.error(`"${file.name}" dimensions could not be safely verified.`);
+          else if (reason === 'PIXEL_LIMIT_EXCEEDED') toast.error(`"${file.name}" dimensions are too large (exceeds 64MP safe limit).`);
+          else if (reason === 'ESTIMATED_MEMORY_EXCEEDED') toast.error(`"${file.name}" requires too much memory to decode safely.`);
+          else if (reason === 'METADATA_TOO_LARGE') toast.error(`"${file.name}" contains unusually large metadata blocks.`);
+          else if (reason === 'MALFORMED_CONTAINER') toast.error(`"${file.name}" has a malformed structure.`);
+          else toast.error(`"${file.name}" was rejected for security reasons.`);
           release(1);
           continue;
         }

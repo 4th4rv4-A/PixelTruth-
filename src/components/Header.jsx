@@ -71,6 +71,44 @@ export default function Header({ activeTab, onTabChange }) {
                 Detect
               </span>
             </button>
+            <button
+              id="tab-inspect"
+              onClick={() => onTabChange('inspect')}
+              className={`h-full flex items-center text-sm font-medium transition-colors border-b-2 ${
+                activeTab === 'inspect'
+                  ? 'border-violet-500 text-ink-100'
+                  : 'border-transparent text-ink-400 hover:text-ink-300'
+              }`}
+            >
+              <span className="flex items-center gap-1.5">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+                  <polyline points="14 2 14 8 20 8" />
+                  <circle cx="10" cy="13" r="2" />
+                  <path d="m11.5 14.5 3 3" />
+                </svg>
+                Inspect
+              </span>
+            </button>
+            <button
+              id="tab-workspace"
+              onClick={() => onTabChange('workspace')}
+              className={`h-full flex items-center text-sm font-medium transition-colors border-b-2 ${
+                activeTab === 'workspace'
+                  ? 'border-teal-500 text-ink-100'
+                  : 'border-transparent text-ink-400 hover:text-ink-300'
+              }`}
+            >
+              <span className="flex items-center gap-1.5">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4 22h14a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v4" />
+                  <path d="M14 2v4a2 2 0 0 0 2 2h4" />
+                  <path d="M3 15h6" />
+                  <path d="M3 18h6" />
+                </svg>
+                Workspace
+              </span>
+            </button>
           </nav>
 
           {/* Dark mode toggle */}
@@ -116,6 +154,26 @@ export default function Header({ activeTab, onTabChange }) {
           }`}
         >
           Detect
+        </button>
+        <button
+          onClick={() => onTabChange('inspect')}
+          className={`flex-1 py-3 text-xs sm:text-sm font-medium transition-colors ${
+            activeTab === 'inspect'
+              ? 'text-ink-100 border-b-2 border-violet-500'
+              : 'text-ink-400'
+          }`}
+        >
+          Inspect
+        </button>
+        <button
+          onClick={() => onTabChange('workspace')}
+          className={`flex-1 py-3 text-xs sm:text-sm font-medium transition-colors ${
+            activeTab === 'workspace'
+              ? 'text-ink-100 border-b-2 border-teal-500'
+              : 'text-ink-400'
+          }`}
+        >
+          Workspace
         </button>
       </div>
     </>

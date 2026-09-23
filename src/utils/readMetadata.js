@@ -1,25 +1,24 @@
-import exifr from 'exifr';
+import { imagePool } from '../workers/instances';
 
 /**
- * Parse EXIF, GPS, and IFD0 metadata from an image file.
+ * Parse EXIF, GPS, and IFD0 metadata from an image file using Web Worker.
  * @param {File} file
+ * @param {AbortSignal} [signal] Optional cancellation signal
  * @returns {Promise<Object>} parsed metadata or empty object
  */
-export async function readMetadata(file) {
+export async function readMetadata(file, signal) {
   try {
-    const data = await exifr.parse(file, {
-      gps: true,
-      exif: true,
-      ifd0: true,
-      iptc: true,
-      xmp: true,
-      tiff: true,
-      translateKeys: true,
-      translateValues: true,
-      reviveValues: true,
+    // We pass the File object directly. postMessage uses structural cloning
+    // which for Blobs/Files is passed by reference (zero-copy memory).
+    const result = await imagePool.dispatch('READ_METADATA', {
+      file
+    }, {
+      signal
     });
-    return data || {};
-  } catch {
+    
+    return result || {};
+  } catch (err) {
+    console.warn(`[PixelTruth] readMetadata failed for ${file.name}:`, err);
     return {};
   }
 }
