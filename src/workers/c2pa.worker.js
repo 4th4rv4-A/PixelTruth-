@@ -27,11 +27,11 @@ async function handleDetectAI(payload, postProgress) {
   try {
     postProgress('INSPECTING');
     reader = await Reader.fromBlob(c2pa, mime, file);
-    const manifestStore = reader.manifestStore;
+    const manifestStore = await reader.manifestStore();
 
     if (!manifestStore || !manifestStore.activeManifest) {
       return {
-        provenance: PROVENANCE_STATE.NO_PROVENANCE,
+        provenance: PROVENANCE_STATE.NO_CREDENTIAL,
         aiSignal: AI_SIGNAL_STATE.NO_SIGNAL,
         raw: null,
       };
@@ -40,20 +40,13 @@ async function handleDetectAI(payload, postProgress) {
     postProgress('VERIFYING');
     const activeManifest = manifestStore.activeManifest;
     
-    // Evaluate Validation State
     let validationStatus = manifestStore.validationStatus || [];
-    let provenanceState = PROVENANCE_STATE.PRESENT_UNVALIDATED;
+    let provenanceState = PROVENANCE_STATE.CREDENTIAL_PRESENT_INVALID;
     
-    // Basic heuristics: empty validation array usually implies valid in c2pa-web, 
-    // or we check the specific code. 
-    // In @contentauth/c2pa-web, activeManifest.isTrustLoaded might exist, 
-    // but typically if validationStatus is empty, it's structurally valid.
     if (validationStatus.length === 0) {
-       // Ideally we'd check against a trust list, but structurally it's valid
-       provenanceState = PROVENANCE_STATE.VALID; 
+       provenanceState = PROVENANCE_STATE.CREDENTIAL_VALID_UNTRUSTED; 
     }
 
-    // Extract assertions for AI inference vs Cryptographic provenance
     let hasCryptographicAiAction = false;
     let hasAiSoftwareString = false;
     let generatorString = 'Unknown';
@@ -76,7 +69,6 @@ async function handleDetectAI(payload, postProgress) {
           data: decodedData,
         });
 
-        // Check for AI action in c2pa.actions
         if (assertion.label === 'c2pa.actions' && decodedData?.actions) {
           for (const action of decodedData.actions) {
             const act = (action.action || '').toLowerCase();
@@ -94,10 +86,6 @@ async function handleDetectAI(payload, postProgress) {
       }
     }
     
-    // Check digital source type on the creation action/ingredient
-    // (If the creator declared it as algorithmic media)
-    
-    // Check generator (Software string) - This is an inference, NOT provenance!
     try {
       const claimGenerator = activeManifest.claimGenerator;
       if (typeof claimGenerator === 'string') {
@@ -111,21 +99,16 @@ async function handleDetectAI(payload, postProgress) {
       // Ignore
     }
 
-    // Determine final states
-    if (hasCryptographicAiAction && (provenanceState === PROVENANCE_STATE.VALID || provenanceState === PROVENANCE_STATE.TRUSTED)) {
-      provenanceState = PROVENANCE_STATE.SIGNED_AI;
-    }
-
     let aiSignal = AI_SIGNAL_STATE.NO_SIGNAL;
     if (hasCryptographicAiAction) {
        aiSignal = AI_SIGNAL_STATE.METADATA_SIGNAL; 
     } else if (hasAiSoftwareString) {
-       aiSignal = AI_SIGNAL_STATE.SOFTWARE_SIGNAL;
+       aiSignal = AI_SIGNAL_STATE.SOFTWARE_INDICATOR;
     }
 
-    // Build normalized result
     return {
       provenance: provenanceState,
+      hasCryptographicAiAction,
       aiSignal: aiSignal,
       generator: generatorString,
       issuer: activeManifest.signatureInfo?.issuer || 'Unknown Signer',
@@ -133,11 +116,11 @@ async function handleDetectAI(payload, postProgress) {
       validationIssues: validationStatus,
       ingredientsCount: activeManifest.ingredients?.length || 0,
       assertions: serializedAssertions,
-      raw: generatorString // A tiny summary for UI
+      raw: generatorString
     };
   } finally {
-    if (reader && typeof reader.dispose === 'function') {
-      reader.dispose();
+    if (reader && typeof reader.free === 'function') {
+      await reader.free();
     }
   }
 }

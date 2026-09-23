@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validateFile } from '../fileValidator.js';
+import { validateHeaderSafety } from '../fileValidator.js';
 
 // Helper to create a fake File object
 function createFakeFile(name, size, bytes) {
@@ -17,14 +17,14 @@ describe('File Intake Security Pipeline', () => {
     const file = new File([''], 'huge.jpg');
     Object.defineProperty(file, 'size', { value: 60 * 1024 * 1024 });
     
-    const result = await validateFile(file);
+    const result = await validateHeaderSafety(file);
     expect(result.valid).toBe(false);
     expect(result.reasons).toContain('FILE_TOO_LARGE');
   });
 
   it('rejects invalid or dangerous filenames', async () => {
     const file = new File([''], 'bad\x00name.jpg');
-    const result = await validateFile(file);
+    const result = await validateHeaderSafety(file);
     expect(result.valid).toBe(false);
     expect(result.reasons).toContain('INVALID_FILENAME');
   });
@@ -32,7 +32,7 @@ describe('File Intake Security Pipeline', () => {
   it('rejects files with invalid signatures (e.g. fake executable)', async () => {
     const bytes = new Uint8Array([0x4D, 0x5A, 0x90, 0x00, 0x03, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0x00, 0x00]); // MZ header
     const file = createFakeFile('fake.jpg', bytes.length, bytes);
-    const result = await validateFile(file);
+    const result = await validateHeaderSafety(file);
     expect(result.valid).toBe(false);
     expect(result.reasons).toContain('UNSUPPORTED_FORMAT');
   });
@@ -49,7 +49,7 @@ describe('File Intake Security Pipeline', () => {
       bytes[i++] = 0x04; bytes[i++] = 0x00; // width = 1024
       
       const file = createFakeFile('test.jpg', bytes.length, bytes);
-      const result = await validateFile(file);
+      const result = await validateHeaderSafety(file);
       
       expect(result.valid).toBe(true);
       expect(result.format).toBe('jpeg');
@@ -68,7 +68,7 @@ describe('File Intake Security Pipeline', () => {
       bytes[i++] = 0x40; bytes[i++] = 0x00; // width = 16384 (268 MP)
       
       const file = createFakeFile('huge_dims.jpg', bytes.length, bytes);
-      const result = await validateFile(file);
+      const result = await validateHeaderSafety(file);
       
       expect(result.valid).toBe(false);
       expect(result.reasons).toContain('PIXEL_LIMIT_EXCEEDED');
@@ -81,7 +81,7 @@ describe('File Intake Security Pipeline', () => {
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
       ]);
       const file = createFakeFile('trunc.jpg', bytes.length, bytes);
-      const result = await validateFile(file);
+      const result = await validateHeaderSafety(file);
       
       expect(result.valid).toBe(false);
       expect(result.reasons).toContain('DIMENSIONS_UNKNOWN');
@@ -107,7 +107,7 @@ describe('File Intake Security Pipeline', () => {
       bytes[i++] = 0x00; bytes[i++] = 0x00; bytes[i++] = 0x02; bytes[i++] = 0x58;
       
       const file = createFakeFile('test.png', bytes.length, bytes);
-      const result = await validateFile(file);
+      const result = await validateHeaderSafety(file);
       
       expect(result.valid).toBe(true);
       expect(result.format).toBe('png');
@@ -126,7 +126,7 @@ describe('File Intake Security Pipeline', () => {
       bytes[i++] = 0xFF; bytes[i++] = 0xFF; bytes[i++] = 0xFF; bytes[i++] = 0xFF;
       
       const file = createFakeFile('bad.png', bytes.length, bytes);
-      const result = await validateFile(file);
+      const result = await validateHeaderSafety(file);
       
       expect(result.valid).toBe(false);
       expect(result.reasons).toContain('MALFORMED_CONTAINER');
@@ -159,7 +159,7 @@ describe('File Intake Security Pipeline', () => {
       bytes[i++] = 0; bytes[i++] = 0; bytes[i++] = 1; bytes[i++] = 0x90;
       
       const file = createFakeFile('test.heic', bytes.length, bytes);
-      const result = await validateFile(file);
+      const result = await validateHeaderSafety(file);
       
       expect(result.valid).toBe(true);
       expect(result.format).toBe('heic');

@@ -118,7 +118,7 @@ export default function AiAnalysisButton({ file, onResult }) {
   if (state === 'ERROR') {
     return (
       <div className="w-full mt-4 p-4 bg-warn-900/20 border border-warn-500/30 rounded-xl">
-        <p className="text-sm font-bold text-warn-400 mb-1">AI Analysis Unavailable</p>
+        <p className="text-sm font-bold text-warn-400 mb-1">Experimental Feature / Model Unavailable</p>
         <p className="text-xs text-surface-400 mb-3">{errorMsg}</p>
         <button 
           onClick={handleStart}
@@ -157,16 +157,19 @@ export default function AiAnalysisButton({ file, onResult }) {
   }
 
   return (
-    <div className="w-full mt-4 border-t border-surface-800 pt-4 flex justify-between items-center">
+    <div className="w-full mt-4 border-t border-surface-800 pt-4 flex justify-between items-start gap-4">
       <div className="flex-1">
-        <h4 className="text-sm font-medium text-surface-300">Advanced AI Analysis</h4>
-        <p className="text-xs text-surface-500">Run local inference. Model (~45MB) will be downloaded on first run.</p>
+        <h4 className="text-sm font-medium text-surface-300 flex items-center gap-2">
+          Advanced AI Analysis 
+          <span className="text-[10px] px-1.5 py-0.5 rounded-sm bg-develop-500/20 text-develop-400 uppercase tracking-wider font-bold">Experimental</span>
+        </h4>
+        <p className="text-xs text-surface-500 mt-1">Local inference architecture is present, but the required ONNX model weight file is currently not provisioned in this deployment.</p>
       </div>
       <button 
-        onClick={handleStart}
-        className="ml-4 px-4 py-2 bg-violet-600/20 hover:bg-violet-600/30 text-violet-400 border border-violet-500/30 rounded-lg text-sm font-medium transition-colors whitespace-nowrap"
+        disabled
+        className="px-4 py-2 bg-surface-800 text-surface-500 border border-surface-700 rounded-lg text-sm font-medium cursor-not-allowed whitespace-nowrap"
       >
-        Run Analysis
+        Model Unavailable
       </button>
     </div>
   );

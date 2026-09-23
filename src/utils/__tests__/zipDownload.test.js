@@ -78,4 +78,18 @@ describe('deduplicateName (imported production function)', () => {
     expect(deduplicateName('image.png', used)).toBe('image.png');
     expect(deduplicateName('screenshot.webp', used)).toBe('screenshot.webp');
   });
+  it('sanitizes path traversal and weird characters', () => {
+    const usedNames = new Set();
+    expect(deduplicateName('../../../etc/passwd', usedNames)).toBe('etc_passwd');
+    expect(deduplicateName('C:\\Windows\\System32\\cmd.exe', usedNames)).toBe('C__Windows_System32_cmd.exe');
+    expect(deduplicateName('a<b\\c.jpg', usedNames)).toBe('a<b_c.jpg');
+    expect(deduplicateName('..\\..\\malicious.sh', usedNames)).toBe('malicious.sh');
+  });
+
+  it('handles empty names', () => {
+    let usedNames = new Set();
+    expect(deduplicateName('', usedNames)).toBe('unnamed_file');
+    usedNames = new Set();
+    expect(deduplicateName('/', usedNames)).toBe('unnamed_file');
+  });
 });

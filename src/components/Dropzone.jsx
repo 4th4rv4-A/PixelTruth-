@@ -1,7 +1,7 @@
 import { useCallback, useRef, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import {
-  validateFile,
+  validateHeaderSafety,
   MAX_FILES,
 } from '../utils/normalizeInput';
 
@@ -46,7 +46,7 @@ export default function Dropzone({ files, onFilesAdded, onReserveSlots, onReleas
 
       for (const file of toProcess) {
         // Validation pipeline
-        const result = await validateFile(file);
+        const result = await validateHeaderSafety(file);
         
         if (!result.valid) {
           const reason = result.reasons[0];

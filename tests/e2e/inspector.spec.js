@@ -10,7 +10,7 @@ test.describe('Inspector View', () => {
 
   test('Load image and generate report', async ({ page }) => {
     const fileChooserPromise = page.waitForEvent('filechooser');
-    await page.locator('text=Click to select files').click();
+    await page.getByRole('button', { name: /upload images/i }).click();
     const fileChooser = await fileChooserPromise;
     
     await fileChooser.setFiles(path.join(process.cwd(), 'tests', 'fixtures', 'generated', 'valid.jpg'));

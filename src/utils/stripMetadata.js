@@ -13,7 +13,7 @@ function getOutputMime(file) {
  * @param {AbortSignal} [signal]
  * @returns {Promise<Blob>}
  */
-export async function stripFull(file, onProgress, signal) {
+export async function stripFull(file, preserveC2pa = false, onProgress, signal) {
   const buffer = await file.arrayBuffer();
   
   const result = await imagePool.dispatch('STRIP_METADATA', {
@@ -21,6 +21,7 @@ export async function stripFull(file, onProgress, signal) {
     mime: file.type,
     name: file.name,
     keepTags: [], // Empty means full strip
+    preserveC2pa,
   }, {
     transfer: [buffer],
     onProgress,
@@ -39,7 +40,7 @@ export async function stripFull(file, onProgress, signal) {
  * @param {AbortSignal} [signal]
  * @returns {Promise<Blob>}
  */
-export async function stripSelective(file, keepTags = [], onProgress, signal) {
+export async function stripSelective(file, keepTags = [], preserveC2pa = false, onProgress, signal) {
   const buffer = await file.arrayBuffer();
   
   const result = await imagePool.dispatch('STRIP_METADATA', {
@@ -47,6 +48,7 @@ export async function stripSelective(file, keepTags = [], onProgress, signal) {
     mime: file.type,
     name: file.name,
     keepTags,
+    preserveC2pa,
   }, {
     transfer: [buffer],
     onProgress,

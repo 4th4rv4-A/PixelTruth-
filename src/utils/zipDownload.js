@@ -8,14 +8,20 @@ import { saveAs } from 'file-saver';
  * @returns {string} unique filename
  */
 export function deduplicateName(name, usedNames) {
-  if (!usedNames.has(name)) {
-    usedNames.add(name);
-    return name;
+  let sanitized = name
+    .replace(/[/\\:]/g, '_')
+    .replace(/\.{2,}/g, '.')
+    .replace(/^[.\-_]+/, '') // strip leading dots/underscores to prevent hidden files or traversal artifacts
+    || 'unnamed_file';
+
+  if (!usedNames.has(sanitized)) {
+    usedNames.add(sanitized);
+    return sanitized;
   }
 
-  const dotIndex = name.lastIndexOf('.');
-  const base = dotIndex !== -1 ? name.slice(0, dotIndex) : name;
-  const ext = dotIndex !== -1 ? name.slice(dotIndex) : '';
+  const dotIndex = sanitized.lastIndexOf('.');
+  const base = dotIndex !== -1 ? sanitized.slice(0, dotIndex) : sanitized;
+  const ext = dotIndex !== -1 ? sanitized.slice(dotIndex) : '';
 
   let counter = 2;
   let candidate = `${base}-${counter}${ext}`;

@@ -35,7 +35,19 @@ export default function VerdictCard({ item }) {
           <path d="m9 12 2 2 4-4" />
         </svg>
       ),
-      title: 'Signed AI Provenance Detected'
+      title: 'Trusted AI Provenance Detected'
+    },
+    [OVERALL_ASSESSMENTS.UNTRUSTED_SIGNED_AI_PROVENANCE]: {
+      borderColor: 'border-l-amber-500',
+      badgeText: 'text-amber-600 dark:text-amber-400',
+      icon: (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-amber-500">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+          <line x1="12" y1="8" x2="12" y2="12" />
+          <line x1="12" y1="16" x2="12.01" y2="16" />
+        </svg>
+      ),
+      title: 'Untrusted Credential (AI Assertion)'
     },
     [OVERALL_ASSESSMENTS.TRUSTED_PROVENANCE_NO_AI_ASSERTION]: {
       borderColor: 'border-l-develop-400',
@@ -47,6 +59,28 @@ export default function VerdictCard({ item }) {
         </svg>
       ),
       title: 'Trusted Provenance (No AI Assertion)'
+    },
+    [OVERALL_ASSESSMENTS.UNTRUSTED_PROVENANCE_NO_AI_ASSERTION]: {
+      borderColor: 'border-l-safelight-500',
+      badgeText: 'text-safelight-600 dark:text-safelight-400',
+      icon: (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-safelight-500">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+        </svg>
+      ),
+      title: 'Untrusted Credential (No AI Assertion)'
+    },
+    [OVERALL_ASSESSMENTS.TAMPERED_PROVENANCE]: {
+      borderColor: 'border-l-warn-600',
+      badgeText: 'text-warn-600 dark:text-warn-400',
+      icon: (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-warn-500">
+          <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+          <line x1="12" y1="9" x2="12" y2="13" />
+          <line x1="12" y1="17" x2="12.01" y2="17" />
+        </svg>
+      ),
+      title: 'Invalid or Tampered Credential'
     },
     [OVERALL_ASSESSMENTS.AI_TOOL_INDICATOR]: {
       borderColor: 'border-l-warn-500',

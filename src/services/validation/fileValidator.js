@@ -23,11 +23,11 @@ function createResult(overrides) {
 
 /**
  * Validates a file strictly by reading its binary headers and checking limits.
- * Does not rely on file extension or MIME type.
+ * Does not rely on file extension or MIME type. Note: This validates header safety only, not full container integrity.
  * @param {File} file
  * @returns {Promise<Object>} structured validation result
  */
-export async function validateFile(file) {
+export async function validateHeaderSafety(file) {
   const result = createResult({ sizeBytes: file.size });
 
   // 1. Filename sanity

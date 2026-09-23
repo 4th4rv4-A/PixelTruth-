@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import toast from 'react-hot-toast';
 import { stripFull, stripSelective } from '../utils/stripMetadata';
 import { downloadAsZip, downloadSingle } from '../utils/zipDownload';
@@ -9,6 +9,7 @@ export default function CleanButton({ files }) {
   const [processing, setProcessing] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0, stage: '' });
   const [sizeReport, setSizeReport] = useState(null);
+  const [policy, setPolicy] = useState('PRIVACY_CLEAN'); // 'PRIVACY_CLEAN' or 'FULL_SANITIZE'
   const abortControllerRef = useRef(null);
 
   if (files.length === 0) return null;
@@ -46,10 +47,12 @@ export default function CleanButton({ files }) {
           setProgress({ current: i + 1, total: files.length, stage: data.stage });
         };
 
+        const preserveC2pa = policy === 'PRIVACY_CLEAN';
+
         if (isJpeg && item.keepTags.length > 0) {
-          cleanedBlob = await stripSelective(item.file, item.keepTags, onProgress, controller.signal);
+          cleanedBlob = await stripSelective(item.file, item.keepTags, preserveC2pa, onProgress, controller.signal);
         } else {
-          cleanedBlob = await stripFull(item.file, onProgress, controller.signal);
+          cleanedBlob = await stripFull(item.file, preserveC2pa, onProgress, controller.signal);
         }
 
         const outputName = getOutputFilename(item.file.name, cleanedBlob.type);
@@ -138,9 +141,6 @@ export default function CleanButton({ files }) {
               <span>
                 {progress.stage || 'PROCESSING'} {progress.current} of {progress.total}
               </span>
-              <span className="absolute right-6 text-xs bg-black/20 hover:bg-black/40 px-2 py-1 rounded cursor-pointer transition-colors">
-                Cancel
-              </span>
             </>
           ) : (
             <>
@@ -167,6 +167,56 @@ export default function CleanButton({ files }) {
           )}
         </span>
       </button>
+
+      {/* Real Cancel Button rendered alongside/below during processing */}
+      {processing && (
+        <button
+          onClick={() => {
+            if (abortControllerRef.current) {
+              abortControllerRef.current.abort();
+            }
+          }}
+          className="mt-2 w-full bg-warn-100 hover:bg-warn-200 text-warn-700 font-medium py-2 px-4 rounded-lg transition-colors"
+        >
+          Cancel Processing
+        </button>
+      )}
+
+      {/* Cleaning Policy Selection (only show when not processing) */}
+      {!processing && (
+        <div className="mt-3 flex gap-4 text-sm justify-center">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input 
+              type="radio" 
+              name="policy" 
+              value="PRIVACY_CLEAN" 
+              checked={policy === 'PRIVACY_CLEAN'} 
+              onChange={() => setPolicy('PRIVACY_CLEAN')} 
+              className="accent-safelight-500"
+            />
+            <span className="text-ink-600 dark:text-ink-300">Privacy Clean (Preserve C2PA)</span>
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input 
+              type="radio" 
+              name="policy" 
+              value="FULL_SANITIZE" 
+              checked={policy === 'FULL_SANITIZE'} 
+              onChange={() => setPolicy('FULL_SANITIZE')} 
+              className="accent-safelight-500"
+            />
+            <span className="text-ink-600 dark:text-ink-300">Full Sanitize (Strip All)</span>
+          </label>
+        </div>
+      )}
+
+      {/* HEIC Transcoding Disclosure */}
+      {!processing && files.some(f => f.file.type === 'image/heic' || f.file.type === 'image/heif' || f.file.name.toLowerCase().endsWith('.heic') || f.file.name.toLowerCase().endsWith('.heif')) && (
+        <div className="mt-3 p-3 bg-warn-900/20 border border-warn-500/30 rounded-lg text-xs text-warn-400 text-left">
+          <strong className="block mb-1">HEIC Transcoding Notice:</strong>
+          HEIC cleaning requires transcoding to JPEG in this browser workflow. The resulting JPEG is not bit-for-bit identical to the original HEIC.
+        </div>
+      )}
 
       {/* Size report */}
       {sizeReport && (

@@ -1,4 +1,4 @@
-import heic2any from 'heic2any';
+import { imagePool } from '../workers/instances';
 
 /** Accepted MIME types */
 export const ACCEPTED_TYPES = [
@@ -21,7 +21,7 @@ export const MAX_FILES = 20;
 /** Max safe pixel dimensions (64 Megapixels) to prevent decompression bombs */
 export const MAX_PIXELS = 64 * 1024 * 1024;
 
-export { validateFile } from '../services/validation/fileValidator.js';
+export { validateHeaderSafety } from '../services/validation/fileValidator.js';
 
 /**
  * Helper to safely generate a thumbnail, converting HEIC to a cheap JPEG if needed.
@@ -41,13 +41,14 @@ export async function createSafeThumbnail(file) {
   }
 
   try {
-    // Create a low-res thumbnail from HEIC
-    const converted = await heic2any({
-      blob: file,
-      toType: 'image/jpeg',
-      quality: 0.1,
-    });
-    const blob = Array.isArray(converted) ? converted[0] : converted;
+    const buffer = await file.arrayBuffer();
+    const result = await imagePool.dispatch('GENERATE_THUMBNAIL', {
+      buffer,
+      mime: file.type,
+      name: file.name
+    }, { transfer: [buffer] });
+
+    const blob = new Blob([result.buffer], { type: 'image/jpeg' });
     return URL.createObjectURL(blob);
   } catch (err) {
     console.error('HEIC thumbnail generation failed:', err);

@@ -30,6 +30,11 @@ export default function VisualForensics({ file, onResult }) {
     abortControllerRef.current = new AbortController();
     const signal = abortControllerRef.current.signal;
     let isSubscribed = true;
+    
+    // eslint-disable-next-line react/set-state-in-effect
+    setLoadingEla(true);
+    // eslint-disable-next-line react/set-state-in-effect
+    setLoadingFft(true);
 
     async function runAnalysis() {
       try {
@@ -77,13 +82,6 @@ export default function VisualForensics({ file, onResult }) {
         abortControllerRef.current.abort();
       }
     };
-  }, [file]);
-
-  useEffect(() => {
-    if (file) {
-      setLoadingEla(true);
-      setLoadingFft(true);
-    }
   }, [file]);
 
   useEffect(() => {

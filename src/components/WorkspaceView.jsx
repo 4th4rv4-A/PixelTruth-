@@ -19,6 +19,7 @@ export default function WorkspaceView() {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react/set-state-in-effect
     loadCases();
   }, []);
 

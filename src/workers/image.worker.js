@@ -104,8 +104,7 @@ async function handleReadMetadata(payload) {
 }
 
 async function handleStripMetadata(payload, postProgress) {
-  let { file, keepTags } = payload;
-  let mime = file.type;
+  let { buffer, mime, name, keepTags, preserveC2pa } = payload;
 
   postProgress('VALIDATING');
 
@@ -115,12 +114,11 @@ async function handleStripMetadata(payload, postProgress) {
     // Attempt lossless full strip
     postProgress('CLEANING');
     try {
-      const arrayBuffer = await file.arrayBuffer();
-      const bytes = new Uint8Array(arrayBuffer);
+      const bytes = new Uint8Array(buffer);
       const policy = {
         removeExif: true, removeGps: true, removeXmp: true,
-        removeIptc: true, removeComments: true, removeIcc: true,
-        removeC2pa: true, preserveC2pa: false,
+        removeIptc: true, removeComments: true, removeIcc: preserveC2pa ? false : true,
+        removeC2pa: !preserveC2pa, preserveC2pa: !!preserveC2pa,
       };
       
       const result = sanitizeImage(bytes, policy);
@@ -134,7 +132,8 @@ async function handleStripMetadata(payload, postProgress) {
 
   // Fallback or Selective
   postProgress('PARSING');
-  let blob = await ensureDecodable(file, file.name);
+  let blob = new Blob([buffer], { type: mime });
+  blob = await ensureDecodable(blob, name);
   const outMime = getOutputMime(blob.type || mime);
 
   if (isSelective) {
@@ -206,6 +205,18 @@ self.onmessage = async (e) => {
       self.postMessage(
         { id, type: 'COMPLETE', result: { buffer: resultBuffer } },
         [resultBuffer]
+      );
+    } else if (action === 'GENERATE_THUMBNAIL') {
+      const { buffer, mime, name } = payload;
+      let blob = new Blob([buffer], { type: mime });
+      const converted = await ensureDecodable(blob, name); // ensures heic is converted to jpeg
+      
+      // If we want it truly low quality, we can downscale it here, but ensureDecodable uses 0.95.
+      // For now, this moves the heavy lifting off the main thread.
+      const outBuffer = await converted.arrayBuffer();
+      self.postMessage(
+        { id, type: 'COMPLETE', result: { buffer: outBuffer } },
+        [outBuffer]
       );
     } else {
       throw new Error(`Unknown action: ${action}`);

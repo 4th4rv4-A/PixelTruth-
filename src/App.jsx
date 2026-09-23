@@ -11,6 +11,7 @@ import InstallPrompt from './components/InstallPrompt';
 import ErrorBoundary from './components/ErrorBoundary';
 import { detectAI } from './utils/detectAI';
 import { createSafeThumbnail, MAX_FILES } from './utils/normalizeInput';
+import { readMetadata, getPrivacyLevel } from './utils/readMetadata';
 import InspectorView from './components/InspectorView';
 import WorkspaceView from './components/WorkspaceView';
 
