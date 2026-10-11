@@ -20,22 +20,20 @@ export const OVERALL_ASSESSMENTS = {
  * @param {Object} input.metadata - { hasAiSoftwareMarker, raw, software }
  * @param {Object} input.ela - { maxDifference }
  * @param {Object} input.fft - { maxMagnitude }
- * @param {Object} input.model - { syntheticLikelihood, signalStrength }
+ * @param {Object} input.fft - { maxMagnitude }
  * @returns {Object} Structured verdict model
  */
 export function aggregateSignals(input) {
-  const { c2pa, metadata, ela, fft, model } = input;
+  const { c2pa, metadata, ela, fft } = input;
 
   const result = {
     provenance: c2pa || {},
     metadataSignals: [],
     forensicSignals: [],
-    modelSignals: [],
     overallAssessment: OVERALL_ASSESSMENTS.INCONCLUSIVE,
     humanReasoning: '',
     limitations: [
-      'Visual forensics (ELA/FFT) highlight structural anomalies, not definitive proof of manipulation.',
-      'AI models are heuristic and subject to adversarial noise or unseen generators.'
+      'Visual forensics (ELA/FFT) highlight structural anomalies, not definitive proof of manipulation.'
     ]
   };
 
@@ -61,19 +59,8 @@ export function aggregateSignals(input) {
     });
   }
 
-  if (model) {
-    if (model.signalStrength === 'HIGH' || model.syntheticLikelihood > 0.8) {
-      result.modelSignals.push({
-        type: 'HIGH_SYNTHETIC_LIKELIHOOD',
-        description: `Local AI model produced a high synthetic likelihood (${(model.syntheticLikelihood * 100).toFixed(1)}%).`
-      });
-    }
-  } else {
-    result.limitations.push('AI Model analysis was not executed or is unavailable.');
-  }
-
   const hasMetadataSignal = result.metadataSignals.length > 0;
-  const numHeuristics = result.forensicSignals.length + result.modelSignals.length;
+  const numHeuristics = result.forensicSignals.length;
 
   // 2. Evaluate Cryptographic Ground Truth
   if (c2pa && c2pa.provenance !== PROVENANCE_STATE.NO_CREDENTIAL) {
@@ -124,11 +111,7 @@ export function aggregateSignals(input) {
 
   if (numHeuristics === 1) {
     result.overallAssessment = OVERALL_ASSESSMENTS.INCONCLUSIVE;
-    if (result.modelSignals.length > 0) {
-      result.humanReasoning = 'Local model analysis produced a synthetic-image signal, but no other corroborating signals or provenance information was available.';
-    } else {
-      result.humanReasoning = 'A single visual forensic anomaly was detected, which often occurs naturally due to sharp edges or upscaling. Insufficient evidence to determine origin.';
-    }
+    result.humanReasoning = 'A single visual forensic anomaly was detected, which often occurs naturally due to sharp edges or upscaling. Insufficient evidence to determine origin.';
     return result;
   }
 

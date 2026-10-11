@@ -30,7 +30,6 @@ PixelTruth is a 100% browser-native web application built with React 19, Vite, a
 ## 6. P3 Future Features
 - Local WebGL or WebGPU acceleration for image processing/resizing.
 - Support for more input formats (e.g., AVIF) and granular output encoding settings (quality sliders).
-- Dedicated local-only on-device ML models via ONNX Runtime Web for visual AI detection without cloud APIs.
 
 ## 7. Dependency Risks
 - `heic2any` and `piexifjs` have not been updated recently; `piexifjs` only supports JPEG, creating a fragmented logic path depending on image format.

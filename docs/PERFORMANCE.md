@@ -24,13 +24,13 @@ We refactored all core utilities and workers to accept the `File` object nativel
 ### Current Baseline (Production Build)
 - **Main App Shell** (`index.js`): ~475 kB (gzipped)
 - **C2PA WASM** (`c2pa_bg.wasm`): 3.2 MB (gzipped)
-- **ONNX Inference Engine** (`ort-wasm-simd-threaded.jsep.wasm`): 6.8 MB (gzipped)
+
 
 ### Lazy Loading Strategy
 While the main application shell is cached proactively by `vite-plugin-pwa` for offline PWA usage, we must ensure the heavy analytical assets do not bloat the initial network hit for users who only want to strip metadata.
 
 **Changes Applied**:
-- The `vite.config.js` `globIgnores` now explicitly excludes `**/c2pa.worker-*.js`, `**/ai.worker-*.js`, and `**/*.wasm`.
+- The `vite.config.js` `globIgnores` now explicitly excludes `**/c2pa.worker-*.js` and `**/*.wasm`.
 - These assets will only be fetched over the network if and when the user clicks the "Forensic Inspector" tab or triggers a C2PA verification.
 
 ## Recommended Performance Budgets

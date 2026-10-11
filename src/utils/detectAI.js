@@ -40,7 +40,7 @@ export async function detectAI(file, signal) {
     
     if (c2paResult) {
       let validationNote = null;
-      if (c2paResult.provenance === PROVENANCE_STATE.PRESENT_UNVALIDATED) {
+      if (c2paResult.provenance === PROVENANCE_STATE.CREDENTIAL_PRESENT_INVALID) {
         if (c2paResult.validationIssues && c2paResult.validationIssues.length > 0) {
            validationNote = `Credential found but validation failed: ${c2paResult.validationIssues.map(i => i.code).join(', ')}. This indicates tampering or missing trust anchors.`;
         } else {
@@ -56,7 +56,7 @@ export async function detectAI(file, signal) {
           validationNote,
           ...c2paResult
         },
-        metadata: c2paResult.aiSignal === AI_SIGNAL_STATE.SOFTWARE_SIGNAL || c2paResult.aiSignal === AI_SIGNAL_STATE.METADATA_SIGNAL 
+        metadata: c2paResult.aiSignal === AI_SIGNAL_STATE.SOFTWARE_INDICATOR || c2paResult.aiSignal === AI_SIGNAL_STATE.METADATA_SIGNAL 
           ? { hasAiSoftwareMarker: true, raw: c2paResult.raw || c2paResult.generator, software: c2paResult.generator }
           : null
       };

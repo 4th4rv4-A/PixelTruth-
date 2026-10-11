@@ -24,10 +24,10 @@ We exhaustively searched the codebase for definitive claims (`verified`, `proof`
 ## 2. Privacy & Security Review
 **Status**: PASS
 
-*   **Zero-Upload Guarantee**: All inspection, metadata carving, C2PA extraction, and ONNX AI inference runs entirely on the client within isolated Web Workers.
+*   **Zero-Upload Guarantee**: All inspection, metadata carving, and C2PA extraction runs entirely on the client within isolated Web Workers.
 *   **Data Retention**: The local IndexedDB workspace explicitly isolates user data and only retains case reports on an opt-in basis. Original image payloads are discarded.
 *   **Network Perimeter**: The Content Security Policy explicitly forbids `unsafe-eval` (where supported) and restricts external requests. External fonts (Google Fonts) have been internalized to `@fontsource` to prevent tracking. 
-*   **AI Model Loading**: The `onnxruntime-web` framework is configured to pull the `.onnx` graph from the local origin (`/models/`), preventing third-party model inference leakage.
+
 
 ## 3. Cleaning Integrity (Binary-Lossless) Review
 **Status**: PASS
@@ -39,7 +39,7 @@ We exhaustively searched the codebase for definitive claims (`verified`, `proof`
 **Status**: PASS
 
 *   **Zero-Copy Memory**: The application utilizes `postMessage` reference-transfer (structural cloning) of `Blob`/`File` objects. Heavy images do not duplicate main thread memory.
-*   **PWA Precache Exclusions**: The heavy analytical components (ONNX 28MB WASM, C2PA 8MB WASM) are strictly excluded from the `vite-plugin-pwa` precache. The core app shell remains <500KB gzipped.
+*   **PWA Precache Exclusions**: The heavy analytical components (C2PA 8MB WASM) are strictly excluded from the `vite-plugin-pwa` precache. The core app shell remains <500KB gzipped.
 *   **Worker Isolation**: Heavy WASM initializations do not block the React main thread.
 
 ## 5. C2PA Validation Review
@@ -52,9 +52,7 @@ We exhaustively searched the codebase for definitive claims (`verified`, `proof`
 
 ## Known Limitations
 
-1. **AI Inference Susceptibility**: The local ONNX AI model is fundamentally probabilistic. It can be bypassed by adversarial perturbation, downscaling, or heavy compression (destroying high-frequency pixel anomalies).
-2. **Missing E2E Browser Environment**: Due to strict local execution constraints, Playwright browsers could not be downloaded in the restricted build environment. While the specs exist and are sound, E2E relies on downstream CI execution.
-3. **Hypothetical Model Path**: The `MODEL_URL` points to `/models/pixeltruth-detector-v1.onnx`, which currently throws a 404. The worker degrades gracefully (as designed), but the actual `.onnx` weight file needs to be provisioned prior to marketing the AI feature.
+1. **Missing E2E Browser Environment**: Due to strict local execution constraints, Playwright browsers could not be downloaded in the restricted build environment. While the specs exist and are sound, E2E relies on downstream CI execution.
 
 ---
 
@@ -66,7 +64,6 @@ We exhaustively searched the codebase for definitive claims (`verified`, `proof`
 - [x] CSP and Security Headers strictly configured
 - [x] `vite-plugin-pwa` excludes heavy WASMs
 - [x] UI Semantics scrubbed of deterministic "truth" claims
-- [ ] **DEPLOYMENT ACTION**: Provision `pixeltruth-detector-v1.onnx` to the `/public/models/` directory prior to enabling AI toggle.
 - [ ] **DEPLOYMENT ACTION**: Trigger Vercel/CI build to execute Playwright E2E test suite. 
 
 **Conclusion**: PixelTruth is **READY** for production deployment.

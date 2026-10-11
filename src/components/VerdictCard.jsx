@@ -1,5 +1,4 @@
 import CredentialDetails from './CredentialDetails';
-import AiAnalysisButton from './AiAnalysisButton';
 import { OVERALL_ASSESSMENTS } from '../utils/aggregator';
 
 export default function VerdictCard({ item }) {
@@ -176,10 +175,6 @@ export default function VerdictCard({ item }) {
         <CredentialDetails result={result.rawResult} />
       )}
 
-      {/* Optional AI Analysis */}
-      <div className="px-5 pb-5">
-        <AiAnalysisButton file={file} />
-      </div>
     </div>
   );
 }

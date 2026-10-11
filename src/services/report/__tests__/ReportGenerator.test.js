@@ -74,8 +74,7 @@ describe('ReportGenerator', () => {
       forensics: {
         overallAssessment: 'VERIFIED_SIGNED_AI_PROVENANCE',
         humanReasoning: 'Signed AI provenance found.',
-        ela: { maxDifference: 150 },
-        modelResult: { syntheticLikelihood: 0.99, signalStrength: 'HIGH', modelVersion: 'v1' }
+        ela: { maxDifference: 150 }
       },
       cleaningRecord: {
         cleanedBuffer: new ArrayBuffer(1000),
@@ -98,7 +97,6 @@ describe('ReportGenerator', () => {
     
     expect(report.forensicSignals.overallAssessment).toBe('VERIFIED_SIGNED_AI_PROVENANCE');
     expect(report.forensicSignals.compressionDifferenceEla.maxDifference).toBe(150);
-    expect(report.forensicSignals.localAiModelResult.score).toBe(0.99);
 
     expect(report.cleaningRecord.cleanedSize).toBe(1000);
     expect(report.cleaningRecord.encodedImageDataChanged).toBe(false);

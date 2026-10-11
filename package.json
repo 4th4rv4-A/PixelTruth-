@@ -21,7 +21,6 @@
     "file-saver": "^2.0.5",
     "heic2any": "^0.0.4",
     "jszip": "^3.10.2",
-    "onnxruntime-web": "^1.30.0",
     "piexifjs": "^1.0.6",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",

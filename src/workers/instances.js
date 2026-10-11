@@ -24,7 +24,3 @@ export const forensicsPool = new WorkerPool(
   () => new Worker(new URL('./forensics.worker.js', import.meta.url), { type: 'module' })
 );
 
-// Singleton instance of the AI Worker Pool
-export const aiPool = new WorkerPool(
-  () => new Worker(new URL('./ai.worker.js', import.meta.url), { type: 'module' })
-);

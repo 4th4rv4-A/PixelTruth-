@@ -29,7 +29,7 @@ export default defineConfig({
         // Precache app shell; C2PA WASM chunk should stay lazy-loaded, not precached,
         // since most users only ever use the Clean tab
         globPatterns: ['**/*.{js,css,html,svg,png}'],
-        globIgnores: ['**/inline-*.js', '**/c2pa.worker-*.js', '**/ai.worker-*.js', '**/*.wasm'],
+        globIgnores: ['**/inline-*.js', '**/c2pa.worker-*.js', '**/*.wasm'],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
       },
     }),

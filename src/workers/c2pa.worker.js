@@ -3,6 +3,7 @@ import wasmSrc from '@contentauth/c2pa-web/resources/c2pa.wasm?url';
 import workerSrc from '@contentauth/c2pa-web/c2pa_worker?url';
 
 import { PROVENANCE_STATE, AI_SIGNAL_STATE } from '../utils/verdicts';
+import { isAiGeneratorString, isAiAction } from '../utils/c2paSignals';
 
 let c2paPromise = null;
 
@@ -71,14 +72,7 @@ async function handleDetectAI(payload, postProgress) {
 
         if (assertion.label === 'c2pa.actions' && decodedData?.actions) {
           for (const action of decodedData.actions) {
-            const act = (action.action || '').toLowerCase();
-            const digitalSourceType = (action.digitalSourceType || '').toLowerCase();
-            if (
-              act.includes('generated') || 
-              act.includes('ai') || 
-              act.includes('synthetic') ||
-              digitalSourceType.includes('trainedalgorithmicmedia')
-            ) {
+            if (isAiAction(action.action, action.digitalSourceType)) {
               hasCryptographicAiAction = true;
             }
           }
@@ -90,8 +84,7 @@ async function handleDetectAI(payload, postProgress) {
       const claimGenerator = activeManifest.claimGenerator;
       if (typeof claimGenerator === 'string') {
         generatorString = claimGenerator.split('(')[0].trim();
-        const lowerGen = claimGenerator.toLowerCase();
-        if (lowerGen.includes('ai') || lowerGen.includes('midjourney') || lowerGen.includes('dall-e') || lowerGen.includes('firefly') || lowerGen.includes('stable diffusion')) {
+        if (isAiGeneratorString(claimGenerator)) {
           hasAiSoftwareString = true;
         }
       }

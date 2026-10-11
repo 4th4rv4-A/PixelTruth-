@@ -10,7 +10,7 @@ PixelTruth includes a `vercel.json` file at the root of the repository that auto
 ```http
 Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval' blob:; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' blob: data:; connect-src 'self' blob: data:; worker-src 'self' blob:; child-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none';
 ```
-*Note: `unsafe-eval` is explicitly prohibited. `wasm-unsafe-eval` is allowed strictly for the ONNX and C2PA WebAssembly runtimes.*
+*Note: `unsafe-eval` is explicitly prohibited. `wasm-unsafe-eval` is allowed strictly for the C2PA WebAssembly runtime.*
 
 ### 2. Strict-Transport-Security (HSTS)
 ```http

@@ -71,7 +71,7 @@ export function boundMetadataObject(obj) {
  * @param {Object} data.binaryStructure 
  * @param {Object} data.metadata
  * @param {Object} data.c2pa
- * @param {Object} data.forensics { ela, fft, modelResult }
+ * @param {Object} data.forensics { ela, fft }
  * @param {Object} data.cleaningRecord
  * @returns {Promise<Object>}
  */
@@ -147,11 +147,6 @@ export async function generateForensicReport(data) {
       frequencyDiagnosticsFft: forensics?.fft ? {
         maxMagnitude: forensics.fft.maxMagnitude
       } : null,
-      localAiModelResult: forensics?.modelResult ? {
-        score: forensics.modelResult.syntheticLikelihood,
-        signalStrength: forensics.modelResult.signalStrength,
-        model: forensics.modelResult.modelVersion
-      } : null,
       metadataIndicators: forensics?.metadataSignals || []
     },
     cleaningRecord: cleaningRecord ? {
@@ -166,7 +161,6 @@ export async function generateForensicReport(data) {
     } : null,
     limitations: forensics?.limitations || [
       'Visual forensics (ELA/FFT) highlight structural anomalies, not definitive proof of manipulation.',
-      'AI models are heuristic and subject to adversarial noise or unseen generators.',
       'True origin verification requires cryptographic Content Credentials (C2PA).'
     ]
   };

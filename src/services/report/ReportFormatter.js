@@ -194,7 +194,6 @@ export function generateHtmlReport(report) {
     ${renderTable({
       'Compression Diagnostics': forensicSignals.compressionDifferenceEla ? 'Elevated local compression differences detected.' : 'No anomalies.',
       'Frequency Diagnostics': forensicSignals.frequencyDiagnosticsFft ? 'Repeating frequency structures detected.' : 'No anomalies.',
-      'AI Model Signal': forensicSignals.localAiModelResult ? `Likelihood: ${(forensicSignals.localAiModelResult.score * 100).toFixed(1)}% (${forensicSignals.localAiModelResult.signalStrength})` : 'Not run.',
       'Metadata Indicators': forensicSignals.metadataIndicators.length > 0 ? forensicSignals.metadataIndicators.map(i => i.description).join(', ') : 'None.'
     })}
   `)}
