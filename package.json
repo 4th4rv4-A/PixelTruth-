@@ -13,7 +13,6 @@
     "test:ci": "vitest run && playwright test"
   },
   "dependencies": {
-    "@contentauth/c2pa-web": "^0.15.1",
     "@fontsource/barlow-condensed": "^5.3.0",
     "@fontsource/inter": "^5.3.0",
     "@tailwindcss/vite": "^4.3.3",
@@ -22,6 +21,7 @@
     "heic2any": "^0.0.4",
     "jszip": "^3.10.2",
     "piexifjs": "^1.0.6",
+    "playwright": "^1.64.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-hot-toast": "^2.6.1",

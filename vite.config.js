@@ -12,9 +12,9 @@ export default defineConfig({
       registerType: 'prompt',
       includeAssets: ['favicon.svg', 'icons.svg'],
       manifest: {
-        name: 'PixelTruth — Image Metadata Cleaner & AI Detector',
+        name: 'PixelTruth — Image Metadata Remover',
         short_name: 'PixelTruth',
-        description: 'Clean image metadata and detect AI-generated images, entirely in your browser. Nothing is ever uploaded.',
+        description: 'Remove EXIF, GPS, and other metadata from your images entirely in your browser. Nothing is ever uploaded.',
         theme_color: '#0D9488',
         background_color: '#ffffff',
         display: 'standalone',
@@ -26,10 +26,10 @@ export default defineConfig({
         ],
       },
       workbox: {
-        // Precache app shell; C2PA WASM chunk should stay lazy-loaded, not precached,
-        // since most users only ever use the Clean tab
+        // Precache app shell; keep *.wasm guard to prevent future dependencies from
+        // silently precaching multi-megabyte binaries
         globPatterns: ['**/*.{js,css,html,svg,png}'],
-        globIgnores: ['**/inline-*.js', '**/c2pa.worker-*.js', '**/*.wasm'],
+        globIgnores: ['**/inline-*.js', '**/*.wasm'],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
       },
     }),

@@ -36,7 +36,8 @@ test.describe('Core Flows', () => {
     // Verify cleaning starts
     await expect(page.locator('text=PROCESSING')).toBeVisible();
 
-    // In a real run, a ZIP download would start. Playwright handles the download promise.
+    // Wait for the ZIP download to start
+    const downloadPromise = page.waitForEvent('download');
     const download = await downloadPromise;
     expect(download.suggestedFilename()).toBe('pixeltruth-cleaned.zip');
   });
