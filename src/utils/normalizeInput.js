@@ -7,10 +7,13 @@ export const ACCEPTED_TYPES = [
   'image/webp',
   'image/heic',
   'image/heif',
+  'image/gif',
+  'image/avif',
 ];
 
 /** File extension fallback check */
-export const ACCEPTED_EXTENSIONS = /\.(jpe?g|png|webp|heic|heif)$/i;
+export const ACCEPTED_EXTENSIONS = /\.(jpe?g|png|webp|heic|heif|gif|avif)$/i;
+
 
 /** Max file size: 50 MB */
 export const MAX_FILE_SIZE = 50 * 1024 * 1024;

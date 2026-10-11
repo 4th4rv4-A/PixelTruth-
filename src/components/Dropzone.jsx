@@ -5,7 +5,13 @@ import {
   MAX_FILES,
 } from '../utils/normalizeInput';
 
-export default function Dropzone({ files, onFilesAdded, onReserveSlots, onReleaseSlots }) {
+export default function Dropzone({
+  files = [],
+  onFilesAdded,
+  onReserveSlots,
+  onReleaseSlots,
+  onClearAll,
+}) {
   const inputRef = useRef(null);
   const dropRef = useRef(null);
 
@@ -45,9 +51,8 @@ export default function Dropzone({ files, onFilesAdded, onReserveSlots, onReleas
       const validFiles = [];
 
       for (const file of toProcess) {
-        // Validation pipeline
         const result = await validateHeaderSafety(file);
-        
+
         if (!result.valid) {
           const reason = result.reasons[0];
           if (reason === 'FILE_TOO_LARGE') toast.error(`"${file.name}" exceeds 50 MB limit`);
@@ -63,7 +68,6 @@ export default function Dropzone({ files, onFilesAdded, onReserveSlots, onReleas
           continue;
         }
 
-        // Keep the original file for all metadata reads to ensure completeness
         validFiles.push(file);
       }
 
@@ -128,70 +132,101 @@ export default function Dropzone({ files, onFilesAdded, onReserveSlots, onReleas
   }, [processFiles]);
 
   return (
-    <div
-      ref={dropRef}
-      onDragOver={handleDrag}
-      onDragEnter={handleDragEnter}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
-      onClick={() => inputRef.current?.click()}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          inputRef.current?.click();
-        }
-      }}
-      role="button"
-      tabIndex={0}
-      aria-label="Upload images for metadata cleaning. Drop files or press Enter to browse."
-      className="group relative frame border-dashed border-ink-400 p-8 sm:p-12 cursor-pointer transition-all duration-300 [&.drag-over]:border-solid [&.drag-over]:border-safelight-500 [&.drag-over]:bg-safelight-500/5 focus:outline-none focus:ring-2 focus:ring-safelight-500 focus:ring-offset-2 dark:focus:ring-offset-ink-950"
-      id="dropzone"
-    >
-      <input
-        ref={inputRef}
-        type="file"
-        multiple
-        accept=".jpg,.jpeg,.png,.webp,.heic,.heif"
-        className="hidden"
-        onChange={(e) => {
-          if (e.target.files?.length) processFiles(e.target.files);
-          e.target.value = '';
-        }}
-      />
-
-      <div className="flex flex-col items-center gap-4 text-center">
-        {/* Upload icon */}
-        <div className="w-16 h-16 rounded-sm bg-ink-100 dark:bg-ink-800 flex items-center justify-center">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-ink-400">
+    <div className="space-y-3">
+      {/* Top Toolbar: SELECT FILES + CLEAR */}
+      <div className="flex items-center justify-between">
+        <button
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          className="px-4 py-2 rounded-md bg-safelight-500 hover:bg-safelight-400 text-ink-50 font-semibold text-xs flex items-center gap-2 shadow-sm transition-colors cursor-pointer"
+          aria-label="Select files to upload"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
             <polyline points="17 8 12 3 7 8" />
             <line x1="12" y1="3" x2="12" y2="15" />
           </svg>
-        </div>
+          SELECT FILES
+        </button>
 
-        <div>
-          <p className="text-lg font-semibold text-ink-800 dark:text-ink-200">
-            Drop images here or{' '}
-            <span className="text-safelight-600 dark:text-safelight-400 underline decoration-safelight-300 dark:decoration-safelight-600 underline-offset-2">
-              browse
-            </span>
-          </p>
-          <p className="mt-1.5 text-sm text-ink-500 dark:text-ink-400">
-            JPEG, PNG, WebP, HEIC — up to 20 files, 50 MB each
-          </p>
-          <p className="mt-1 text-xs text-ink-400 dark:text-ink-500">
-            You can also paste images from your clipboard (Ctrl+V)
-          </p>
-        </div>
+        {files.length > 0 && onClearAll && (
+          <button
+            type="button"
+            onClick={onClearAll}
+            className="px-3 py-1.5 rounded-md bg-ink-200 hover:bg-red-500/10 hover:text-red-500 dark:bg-ink-800 text-ink-700 dark:text-ink-300 text-xs font-semibold transition-colors cursor-pointer"
+            aria-label="Clear all files in queue"
+          >
+            CLEAR
+          </button>
+        )}
+      </div>
 
-        {/* HEIC note */}
-        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-sm bg-warn-500/10 text-warn-500 text-xs font-medium">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="10" />
-            <line x1="12" y1="16" x2="12" y2="12" />
-            <line x1="12" y1="8" x2="12.01" y2="8" />
-          </svg>
-          HEIC files are converted to JPEG before processing
+      {/* Dropzone Area */}
+      <div
+        ref={dropRef}
+        onDragOver={handleDrag}
+        onDragEnter={handleDragEnter}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        onClick={() => inputRef.current?.click()}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            inputRef.current?.click();
+          }
+        }}
+        role="button"
+        tabIndex={0}
+        aria-label="Upload images for metadata cleaning. Drop files or press Enter to browse."
+        className="group relative frame border-dashed border-ink-400 p-8 sm:p-12 cursor-pointer transition-all duration-300 [&.drag-over]:border-solid [&.drag-over]:border-safelight-500 [&.drag-over]:bg-safelight-500/5 focus:outline-none focus:ring-2 focus:ring-safelight-500 focus:ring-offset-2 dark:focus:ring-offset-ink-950"
+        id="dropzone"
+      >
+        <input
+          ref={inputRef}
+          type="file"
+          multiple
+          accept=".jpg,.jpeg,.png,.webp,.heic,.heif"
+          className="hidden"
+          onChange={(e) => {
+            if (e.target.files?.length) processFiles(e.target.files);
+            e.target.value = '';
+          }}
+        />
+
+        <div className="flex flex-col items-center gap-4 text-center">
+          {/* Upload icon */}
+          <div className="w-16 h-16 rounded-sm bg-ink-100 dark:bg-ink-800 flex items-center justify-center">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-ink-400">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="17 8 12 3 7 8" />
+              <line x1="12" y1="3" x2="12" y2="15" />
+            </svg>
+          </div>
+
+          <div>
+            <p className="text-lg font-semibold text-ink-800 dark:text-ink-200">
+              Drop Your Files Here or{' '}
+              <span className="text-safelight-600 dark:text-safelight-400 underline decoration-safelight-300 dark:decoration-safelight-600 underline-offset-2">
+                browse
+              </span>
+            </p>
+            <p className="mt-1.5 text-sm text-ink-500 dark:text-ink-400">
+              JPEG, PNG, WebP, HEIC — up to 20 files, 50 MB each
+            </p>
+            <p className="mt-1 text-xs text-ink-400 dark:text-ink-500">
+              You can also paste images from your clipboard (Ctrl+V)
+            </p>
+          </div>
+
+          {/* HEIC note */}
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-sm bg-warn-500/10 text-warn-500 text-xs font-medium">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="16" x2="12" y2="12" />
+              <line x1="12" y1="8" x2="12.01" y2="8" />
+            </svg>
+            HEIC files are converted to JPEG before processing
+          </div>
         </div>
       </div>
     </div>

@@ -7,27 +7,25 @@
  * @param {boolean} [policy.removeXmp=true]
  * @param {boolean} [policy.removeIptc=true]
  * @param {boolean} [policy.removeComments=true]
- * @param {boolean} [policy.removeIcc=false]
- * @param {boolean} [policy.preserveC2pa=true]
- * @param {boolean} [policy.removeC2pa=false]
+ * @param {boolean} [policy.removeIcc=false] Default false: preserves ICC color profile unless fullSanitize is true
+ * @param {boolean} [policy.preserveOrientation=true] Default true: preserves Orientation tag
+ * @param {boolean} [policy.preserveColorSpace=true] Default true: preserves ColorSpace tag
+ * @param {boolean} [policy.fullSanitize=false] If true, strips ICC color profile as well
  * @returns {Object} normalized policy
- * @throws {Error} if policy combination is invalid
  */
 export function validatePolicy(policy = {}) {
+  const isFullSanitize = policy.fullSanitize ?? false;
   const normalized = {
     removeExif: policy.removeExif ?? true,
-    removeGps: policy.removeGps ?? true, // Usually part of EXIF, but explicit intent
+    removeGps: policy.removeGps ?? true,
     removeXmp: policy.removeXmp ?? true,
     removeIptc: policy.removeIptc ?? true,
     removeComments: policy.removeComments ?? true,
-    removeIcc: policy.removeIcc ?? false,
-    preserveC2pa: policy.preserveC2pa ?? true,
-    removeC2pa: policy.removeC2pa ?? false,
+    removeIcc: policy.removeIcc ?? (isFullSanitize ? true : false),
+    preserveOrientation: policy.preserveOrientation ?? true,
+    preserveColorSpace: policy.preserveColorSpace ?? true,
+    fullSanitize: isFullSanitize,
   };
-
-  if (normalized.preserveC2pa && normalized.removeC2pa) {
-    throw new Error('Invalid policy: cannot both preserve and remove C2PA.');
-  }
 
   return normalized;
 }
@@ -42,7 +40,6 @@ export function createResult({
   removedSegments = [],
   preservedSegments = [],
   imageBitstreamChanged = false,
-  c2paPreserved = false,
   warnings = [],
   error = null,
   status = 'success', // 'success', 'unsupported', 'malformed', 'unsafe', 'fallback-required'
@@ -54,7 +51,6 @@ export function createResult({
     removedSegments,
     preservedSegments,
     imageBitstreamChanged,
-    c2paPreserved,
     warnings,
     error,
     status,

@@ -1,46 +1,39 @@
 # PixelTruth Performance Optimization
 
-## Architecture & Worker Memory (Zero-Copy)
+## Architecture & Memory Profile
 
-### The Problem
-During heavy profiling, it was identified that when a user dropped a large image (e.g. 50MB) into the PixelTruth queue, the browser would consume **150MB+ of main thread memory**. 
-This occurred because the application was calling `await file.arrayBuffer()` concurrently in three separate places to dispatch the data to Web Workers:
-1. `readMetadata` -> `imagePool`
-2. `detectAI` -> `c2paPool`
-3. `InspectorView` -> `inspectorPool`
+### Zero-Copy Worker Memory
+During queue ingestion, `File` objects are passed directly to worker tasks or sliced on demand. Workers consume `ArrayBuffer` payloads using transferable objects (`transfer: [buffer]`), avoiding duplicate allocations on the main thread and keeping the UI thread fluid.
 
-Every call to `file.arrayBuffer()` allocated a brand new block of RAM in the main thread.
+### Single Pool Resource Footprint
+With the removal of redundant worker pools (`c2paPool`, `inspectorPool`, `forensicsPool`), background memory and context-switching overhead are significantly reduced. All tasks run through a single `imagePool` bounded by `navigator.hardwareConcurrency` (max 4 concurrent threads).
 
-### The Solution: Zero-Copy Blob Transfer
-Web Workers use the structured clone algorithm. When transferring raw `ArrayBuffer` objects without neutering them (`transfer: [buffer]`), the buffer is either cloned, or if transferred, neutered (making it unusable for the other two parallel tasks). 
+---
 
-However, `Blob` and `File` objects are handled entirely by reference. 
+## Production Build Metrics (Measured)
 
-We refactored all core utilities and workers to accept the `File` object natively. The workers now invoke `await file.arrayBuffer()` internally.
-**Result**: The 50MB image uses exactly **0 bytes** of extra main thread memory during dispatch. The browser reads the bytes straight from the disk-backed Blob into the worker thread.
+Following the removal of C2PA, Inspect, and Workspace modules:
 
-## Bundle Analysis & Precache Exclusions
+| Asset | Baseline (HEAD `da1c6b3`) | Current Measured Build | Delta |
+|---|---|---|---|
+| App Shell (`index-*.js`) | 433.24 kB raw / **129.75 kB gzip** | 388.93 kB raw / **119.20 kB gzip** | -10.55 kB gzip (-8.1%) |
+| Stylesheet (`index-*.css`) | 55.64 kB raw / 9.76 kB gzip | 48.79 kB raw / 8.69 kB gzip | -1.07 kB gzip |
+| Worker (`image.worker-*.js`) | 1,467.86 kB raw | 1,470.24 kB raw | +2.38 kB raw |
+| C2PA Worker | 71.49 kB raw | **0 kB (Deleted)** | -71.49 kB |
+| C2PA WASM (`c2pa_bg-*.wasm`)| 8,434.89 kB raw / 3,247.22 kB gzip | **0 kB (Deleted)** | -8.43 MB raw |
+| Total `dist/` Directory Size | **12.0 MB** | **~3.17 MB** | **-8.83 MB (-73.6%)** |
+| PWA Precache | 19 entries / 2,003.81 KiB | 16 entries / 1,905.11 KiB | -3 entries / -98.7 KiB |
 
-### Current Baseline (Production Build)
-- **Main App Shell** (`index.js`): ~475 kB (gzipped)
-- **C2PA WASM** (`c2pa_bg.wasm`): 3.2 MB (gzipped)
+---
 
+## Performance Budgets
 
-### Lazy Loading Strategy
-While the main application shell is cached proactively by `vite-plugin-pwa` for offline PWA usage, we must ensure the heavy analytical assets do not bloat the initial network hit for users who only want to strip metadata.
-
-**Changes Applied**:
-- The `vite.config.js` `globIgnores` now explicitly excludes `**/c2pa.worker-*.js` and `**/*.wasm`.
-- These assets will only be fetched over the network if and when the user clicks the "Forensic Inspector" tab or triggers a C2PA verification.
-
-## Recommended Performance Budgets
-To maintain the snappy "local app" feel:
-
-1. **Initial Page Load JS (App Shell)**: 
-   - **Budget**: < 500 KB gzipped.
-   - **Current**: 475 KB (PASS)
-2. **First Input Delay (FID)**: 
-   - **Budget**: < 100ms.
-   - **Current**: Zero-copy offloading ensures main thread is completely unblocked during ingestion.
-3. **Lazy Asset Hydration**:
-   - The AI WASM (6.8MB) is permitted to exceed normal web budgets purely because it is (a) opt-in via user interaction, and (b) executing a local neural network.
+1. **Initial Page Load JS (App Shell)**:
+   - **Budget**: $\le 135\text{ kB}$ gzip.
+   - **Measured**: **119.20 kB gzip** (PASS).
+2. **Binary WASM Footprint**:
+   - **Budget**: 0 kB.
+   - **Measured**: 0 kB (PASS — all `.wasm` files eliminated).
+3. **Total Dist Footprint**:
+   - **Budget**: $\le 4\text{ MB}$.
+   - **Measured**: **~3.17 MB** (PASS).

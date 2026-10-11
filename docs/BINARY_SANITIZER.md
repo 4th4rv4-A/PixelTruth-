@@ -1,24 +1,26 @@
 # Lossless Binary Sanitization Engine
 
-PixelTruth implements a custom, format-aware binary sanitization engine in `src/services/binary/`. 
+PixelTruth implements a custom, format-aware binary sanitization engine in `src/services/binary/`.
 
-This engine is used during the metadata cleaning process to remove privacy-compromising metadata without re-encoding or re-compressing the actual image pixel payload. This ensures perfect preservation of image quality (lossless) and significantly improves performance by avoiding HTML Canvas operations on the main thread.
+This engine strips privacy-compromising metadata directly at the byte level without re-encoding or re-compressing the actual image pixel payload. This ensures lossless preservation of image quality and avoids HTML Canvas operations.
 
 ## Supported Formats
 
-- **JPEG**: Lossless removal of APP0-APP15 (including EXIF, XMP, IPTC, JUMBF/C2PA) and COM segments. The payload after `SOS` (Start of Scan) is preserved exactly.
-- **PNG**: Lossless removal of ancillary text and metadata chunks (`eXIf`, `tEXt`, `zTXt`, `iTXt`, `caBX`, `iCCP`). Critical chunks (`IHDR`, `PLTE`, `IDAT`, `IEND`) are never modified.
-- **WebP**: Lossless removal of metadata chunks (`EXIF`, `XMP `, `ICCP`) from the RIFF container. The `VP8X` flags and RIFF header size are safely rewritten, but the `VP8`/`VP8L` compressed bitstream is untouched.
+- **JPEG**: Lossless removal of APP0–APP15 (including EXIF, XMP, IPTC) and COM segments. The pixel payload from `SOS` (Start of Scan) through `EOI` (End of Image) is preserved byte-for-byte.
+  - **Orientation & ColorSpace Preservation**: By default, `extractExifPreserveTags` inspects the input bytes for `Orientation` (IFD0 tag `0x0112`) and `ColorSpace` (Exif IFD tag `0xA001`). If either exists, `buildMinimalExifApp1` uses direct byte construction (no base64 or external library overhead) to synthesize and splice a minimal APP1 segment ahead of `SOS`. If no orientation tag was present, no empty APP1 segment is injected.
+  - **ICC Profile Preservation**: ICC color profiles (in `APP2` segments) are preserved by default (`removeIcc: false`), ensuring colors do not shift. Stripping ICC profiles is available via the explicit `Full Sanitize` toggle (`removeIcc: true`).
+- **PNG**: Lossless removal of ancillary text and metadata chunks (`eXIf`, `tEXt`, `zTXt`, `iTXt`, `iCCP`). Critical chunks (`IHDR`, `PLTE`, `IDAT`, `IEND`) are never modified. ICC profile chunk (`iCCP`) is preserved by default unless `Full Sanitize` is enabled.
+- **WebP**: Lossless removal of metadata chunks (`EXIF`, `XMP `, `ICCP`) from the RIFF container. The `VP8X` flags and RIFF header size are safely rewritten, but the compressed bitstream (`VP8`/`VP8L`) is untouched.
 
-## Unsupported Formats & Fallback
+## Format Intake Without Lossless Carver
 
-- **HEIC / HEIF**: ISO Base Media File Format box parsing is highly complex and currently unsupported for safe binary editing in this engine. HEIC files automatically fall back to the legacy canvas pipeline, where they are converted to JPEG (`heic2any`) and fully re-encoded.
+- **GIF & AVIF**: Intake validation parses header-level dimensions (GIF: logical screen descriptor bytes 6–9; AVIF: ISO-BMFF `ispe` box inside `meta`). Because lossless binary carvers are not implemented for GIF/AVIF containers, PixelTruth strictly surfaces `"Metadata removal not supported for this format (lossless carver unavailable)"` rather than re-encoding pixels. PixelTruth strictly forbids silent pixel re-encoding.
+- **HEIC / HEIF**: High-efficiency containers are decoded and converted to JPEG in the background worker via `heic2any` for client-side processing.
 
-### The Fallback Mechanism
+## Deterministic Invariants
 
-If the binary sanitization engine encounters a file it cannot safely process, it returns a `fallback-required`, `malformed`, or `unsafe` status. The `stripMetadata.js` orchestration layer will log a warning and seamlessly fall back to drawing the image to an HTML Canvas to completely scrub it via re-encoding.
-
-## Limitations
-
-- **Selective Stripping**: The binary engine removes entire metadata segments (e.g. the entire `APP1` EXIF block). If a user requests a *selective* strip (where specific EXIF tags are preserved but others are removed), PixelTruth falls back to using `piexifjs` to parse and rewrite the EXIF directory natively. (This fallback still preserves the image pixel payload for JPEG, as `piexifjs` operates on DataURLs).
-- **Corrupt Files**: Files with mismatched internal bounds, truncated chunk headers, or signatures matching multiple definitions will be aggressively rejected as `malformed` to prevent DOS attacks or memory leaks in the parser.
+The sanitization engine is verified by vitest invariant assertions (`src/services/binary/__tests__/binarySanitizer.test.js`):
+1. Stripping a JPEG with `Orientation = 6` retains an `APP1` containing `0x0112 = 6`.
+2. Stripping a JPEG with GPS, Make, Model, and Orientation removes all sensitive tags while preserving `Orientation` and ensuring the `SOS` -> `EOI` slice remains strictly identical (`deepEqual`).
+3. Default policy retains ICC profile (`APP2`); `Full Sanitize` removes it.
+4. Input JPEGs without orientation data receive no synthesized `APP1` segment.

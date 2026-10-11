@@ -104,7 +104,7 @@ async function handleReadMetadata(payload) {
 }
 
 async function handleStripMetadata(payload, postProgress) {
-  let { buffer, mime, name, keepTags, preserveC2pa } = payload;
+  let { buffer, mime, name, keepTags, fullSanitize } = payload;
 
   postProgress('VALIDATING');
 
@@ -116,17 +116,35 @@ async function handleStripMetadata(payload, postProgress) {
     try {
       const bytes = new Uint8Array(buffer);
       const policy = {
-        removeExif: true, removeGps: true, removeXmp: true,
-        removeIptc: true, removeComments: true, removeIcc: preserveC2pa ? false : true,
-        removeC2pa: !preserveC2pa, preserveC2pa: !!preserveC2pa,
+        removeExif: true,
+        removeGps: true,
+        removeXmp: true,
+        removeIptc: true,
+        removeComments: true,
+        removeIcc: !!fullSanitize,
+        preserveOrientation: true,
+        preserveColorSpace: true,
+        fullSanitize: !!fullSanitize,
       };
       
       const result = sanitizeImage(bytes, policy);
       if (result.status === 'success' && result.outputBlob) {
         return await result.outputBlob.arrayBuffer();
       }
+      if (result.status === 'unsupported' || (!isHeicName(name) && result.status !== 'success')) {
+        const errorMsg = result.status === 'unsupported'
+          ? 'Metadata removal not supported for this format (lossless carver unavailable)'
+          : (result.error || 'Lossless metadata removal failed');
+        throw new Error(errorMsg);
+      }
     } catch (err) {
-      console.warn('Lossless strip failed in worker, falling back.', err);
+      if (err.message && err.message.includes('not supported for this format')) {
+        throw err;
+      }
+      if (!isHeicName(name)) {
+        throw new Error(`Lossless metadata removal failed: ${err.message || 'unknown error'}`);
+      }
+      console.warn('Lossless strip failed in worker, falling back for HEIC.', err);
     }
   }
 
@@ -135,6 +153,7 @@ async function handleStripMetadata(payload, postProgress) {
   let blob = new Blob([buffer], { type: mime });
   blob = await ensureDecodable(blob, name);
   const outMime = getOutputMime(blob.type || mime);
+
 
   if (isSelective) {
     postProgress('CLEANING');

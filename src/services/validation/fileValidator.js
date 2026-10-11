@@ -62,6 +62,13 @@ export async function validateHeaderSafety(file) {
     result.format = 'png';
     result.mime = 'image/png';
     parsePng(bytes, result);
+  } else if (
+    bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46 &&
+    bytes[3] === 0x38 && (bytes[4] === 0x37 || bytes[4] === 0x39) && bytes[5] === 0x61
+  ) {
+    result.format = 'gif';
+    result.mime = 'image/gif';
+    parseGif(bytes, result);
   } else {
     const riff = textDecoder.decode(bytes.subarray(0, 4));
     const webp = textDecoder.decode(bytes.subarray(8, 12));
@@ -72,16 +79,34 @@ export async function validateHeaderSafety(file) {
     } else {
       const ftyp = textDecoder.decode(bytes.subarray(4, 8));
       if (ftyp === 'ftyp') {
-        result.format = 'heic';
-        // could be heic or heif depending on brand, we'll map to heic
-        result.mime = 'image/heic'; 
-        parseHeic(bytes, result);
+        const majorBrand = textDecoder.decode(bytes.subarray(8, 12));
+        const ftypLen = (bytes[0] << 24) | (bytes[1] << 16) | (bytes[2] << 8) | bytes[3];
+        let isAvif = majorBrand === 'avif' || majorBrand === 'avis';
+        if (!isAvif && ftypLen > 16) {
+          for (let b = 16; b + 4 <= Math.min(bytes.length, ftypLen); b += 4) {
+            const brand = textDecoder.decode(bytes.subarray(b, b + 4));
+            if (brand === 'avif' || brand === 'avis') {
+              isAvif = true;
+              break;
+            }
+          }
+        }
+
+        if (isAvif) {
+          result.format = 'avif';
+          result.mime = 'image/avif';
+        } else {
+          result.format = 'heic';
+          result.mime = 'image/heic';
+        }
+        parseBmff(bytes, result);
       } else {
         result.reasons.push('UNSUPPORTED_FORMAT');
         return result;
       }
     }
   }
+
 
   // 4. Validate parsed results
   if (result.reasons.length > 0) {
@@ -301,9 +326,26 @@ function parseWebp(bytes, result) {
 }
 
 /**
- * Parses HEIC/BMFF to find the 'ispe' box for dimensions.
+ * Parses GIF Logical Screen Descriptor to extract dimensions (bytes 6-9, little-endian).
  */
-function parseHeic(bytes, result) {
+function parseGif(bytes, result) {
+  if (bytes.length < 10) {
+    result.reasons.push('DIMENSIONS_UNKNOWN');
+    return;
+  }
+  // Logical Screen Descriptor width and height (16-bit unsigned little-endian)
+  result.width = bytes[6] | (bytes[7] << 8);
+  result.height = bytes[8] | (bytes[9] << 8);
+
+  if (result.width <= 0 || result.height <= 0) {
+    result.reasons.push('DIMENSIONS_UNKNOWN');
+  }
+}
+
+/**
+ * Parses HEIC/AVIF/BMFF container to find the 'ispe' box for dimensions.
+ */
+function parseBmff(bytes, result) {
   let offset = 0;
   
   // Basic BMFF box traversal
@@ -315,10 +357,6 @@ function parseHeic(bytes, result) {
 
     if (size === 1) { // 64-bit size
       if (offset + 16 > bytes.length) break;
-      // We only care about reasonable file sizes (fit in 32 bits), so we just read the lower 32 bits
-      // In JS, large bitwise ops need care, but we just want to avoid crashing on huge boxes.
-      // If it's a huge box (mdat), we can just skip or stop parsing.
-      // We're just looking for 'ispe', which is usually in 'meta' -> 'iprp' -> 'ipco'
       size = (bytes[offset + 12] << 24) | (bytes[offset + 13] << 16) | (bytes[offset + 14] << 8) | bytes[offset + 15];
       offset += 16;
     } else {
@@ -326,7 +364,6 @@ function parseHeic(bytes, result) {
     }
 
     if (size === 0) {
-      // Box extends to EOF
       break; 
     }
 
@@ -334,7 +371,7 @@ function parseHeic(bytes, result) {
     if (size === 1) payloadSize = size - 16;
 
     if (type === 'meta' || type === 'iprp' || type === 'ipco') {
-      // Container boxes, we dive into them
+      // Container boxes, dive into them
       if (type === 'meta') {
         // meta has 4 byte version/flags
         offset += 4; 
@@ -359,3 +396,4 @@ function parseHeic(bytes, result) {
     result.reasons.push('DIMENSIONS_UNKNOWN');
   }
 }
+

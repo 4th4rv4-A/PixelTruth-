@@ -1,48 +1,51 @@
 # PixelTruth Automated Test Suite
 
-This document describes the automated testing infrastructure for PixelTruth, designed to prevent regressions across security, core functionality, performance, and accessibility.
+This document describes the automated testing infrastructure for PixelTruth, verifying security, lossless byte preservation, orientation/color handling, performance, and accessibility.
 
 ## Test Layers
 
 ### 1. Unit & Invariant Tests (`npm run test`)
-Powered by **Vitest**, these tests run near-instantly and cover:
-- **Binary Parsers**: Validates JPEG, PNG, and WebP segment routing and removal logic.
-- **Regression Invariants**: Explicit assertions guarantee that *when metadata is removed, the remaining image data is preserved byte-for-byte*.
-- **Verdict Engine**: Validates the aggregation logic for AI and Provenance signals.
-- **Adversarial Resiliency**: Feeds truncated, malformed, and out-of-bounds byte arrays into the parsers to ensure they fail gracefully rather than crashing or allocating unbounded memory.
+Powered by **Vitest**, all 8 test suites (94 total tests) run in under 1 second:
 
-### 2. End-to-End Browser Tests (`npm run test:e2e`)
-Powered by **Playwright**, these tests boot a local browser and perform realistic user flows:
-- **Core Flows (`core-flows.spec.js`)**: Automates uploading files, interacting with the file queue, testing max-file boundaries, initiating batch cleans, and downloading ZIP results.
-- **Forensic Inspector (`inspector.spec.js`)**: Tests the report generation, worker message passing, and UI transitions.
-- **Performance Telemetry (`performance.spec.js`)**: Establishes rough assertions for the initial app shell load and worker initialization.
+- **Binary Carver & Invariants (`binarySanitizer.test.js`)**:
+  - Asserts that JPEG stripping preserves `Orientation` (`0x0112`) via fresh direct byte APP1 generation.
+  - Verifies that GPS, camera make/model, and timestamp metadata are removed while `SOS` -> `EOI` pixel bytes remain byte-for-byte identical (`deepEqual`).
+  - Verifies default policy retains ICC profiles (`APP2`), while `Full Sanitize` removes them.
+  - Asserts that JPEGs without orientation data do not receive empty APP1 segments.
+  - Asserts PNG ancillary chunk stripping and WebP chunk rewriting without altering pixel bitstreams.
+- **Header Safety & Format Intake (`fileValidator.test.js`)**:
+  - Validates dimension parsing and container safety across JPEG (SOF), PNG (IHDR), HEIC (BMFF `ispe`), GIF (logical screen descriptor for GIF87a/89a), and AVIF (`ftyp` brands + `ispe`).
+  - Enforces 50 MB file size limit, 64 MP decompression limit, and 500 MB memory estimation limit.
+- **Metadata Extraction & Whitelist Sync (`readMetadata.test.js`)**:
+  - Validates tag extraction and shared preserved tag whitelist (`PRESERVED_TAGS_BY_MIME`, `ALWAYS_KEEP_TAGS`).
+- **Archive & Download Utilities (`zipDownload.test.js`)**:
+  - Validates single-file download triggers and bulk ZIP creation via JSZip.
+- **Queue & Intake Validation (`sizeAndHeic.test.js`, `normalizeInput.test.js`, `rapidImport.test.js`)**:
+  - Asserts file limit (20 files), concurrency safety, and HEIC thumbnail offloading.
 
-### 3. Accessibility Checks (`npm run test:e2e`)
-Using **@axe-core/playwright** embedded in the E2E suite (`a11y.spec.js`), the application is automatically scanned for WCAG violations including contrast, ARIA labels, and focus ordering.
+### 2. End-to-End Tests (`npm run test:e2e`)
+Powered by **Playwright**:
 
-## Fixtures & Test Data
-To keep the Git repository small, we **do not check in binary image files**.
-Instead, we procedurally generate byte-perfect minimal valid and malformed JPEGs/PNGs via a script.
-**Run:**
-```bash
-node tests/fixtures/generate.js
-```
-This drops the test data into `tests/fixtures/generated/` (which is ignored by Git).
+- **Core Flows (`tests/e2e/core-flows.spec.js`)**: Upload files, file queue interactions, per-file remove, bulk clean, and ZIP download.
+- **Accessibility (`tests/e2e/a11y.spec.js`)**: Automated axe scans using `@axe-core/playwright` on the single-page application across three states: initial load, file queued, and post-clean completion.
+- **Performance Telemetry (`tests/e2e/performance.spec.js`)**: Shell load and worker initialization timings.
+
+> [!NOTE]
+> **Environment Limitation**: In restricted sandbox environments where external browser binaries cannot be installed (`~/.cache/ms-playwright` empty and CDN blocked), running `npm run test:e2e` will report missing browsers. E2E tests are targeted to run in standard CI environments where browsers can be downloaded.
 
 ## Running Tests
 
-**Run all fast unit tests:**
+**Run unit test suite:**
 ```bash
-npm run test
+npm test
 ```
 
-**Run End-to-End tests (Requires Playwright browsers):**
+**Run linter (oxlint):**
 ```bash
-# Ensure dev server is not already running on port 5173
-npm run test:e2e
+npm run lint
 ```
 
-**Run all tests (CI Pipeline Equivalent):**
+**Run build:**
 ```bash
-npm run test:ci
+npm run build
 ```

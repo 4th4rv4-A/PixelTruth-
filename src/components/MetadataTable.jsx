@@ -1,4 +1,5 @@
-import { ALWAYS_KEEP_TAGS } from '../utils/readMetadata';
+import { useState } from 'react';
+import { isTagAlwaysKept } from '../utils/readMetadata';
 
 /**
  * Format metadata values for display.
@@ -41,22 +42,33 @@ function categorize(key) {
   return { group: '📋 Other', order: 5 };
 }
 
-export default function MetadataTable({ metadata, keepTags, onToggleTag, isJpeg }) {
+export default function MetadataTable({ metadata = {}, keepTags = [], onToggleTag, isJpeg, mimeType }) {
+  const [searchQuery, setSearchQuery] = useState('');
+
   const entries = Object.entries(metadata).filter(
     ([, value]) => value !== undefined && value !== null && value !== ''
   );
 
   if (entries.length === 0) {
     return (
-      <div className="px-4 py-6 text-center text-sm text-ink-400 dark:text-ink-500">
-        No metadata found in this image.
+      <div className="px-4 py-8 text-center text-sm text-ink-400 dark:text-ink-500 frame">
+        No metadata found in this file.
       </div>
     );
   }
 
-  // Group entries by category
+  // Filter entries based on search query
+  const query = searchQuery.toLowerCase().trim();
+  const filteredEntries = query
+    ? entries.filter(([key, value]) => {
+        const valStr = formatValue(value).toLowerCase();
+        return key.toLowerCase().includes(query) || valStr.includes(query);
+      })
+    : entries;
+
+  // Group filtered entries by category
   const grouped = {};
-  for (const [key, value] of entries) {
+  for (const [key, value] of filteredEntries) {
     const { group, order } = categorize(key);
     if (!grouped[group]) grouped[group] = { order, entries: [] };
     grouped[group].entries.push([key, value]);
@@ -64,54 +76,94 @@ export default function MetadataTable({ metadata, keepTags, onToggleTag, isJpeg 
 
   const sortedGroups = Object.entries(grouped).sort(([, a], [, b]) => a.order - b.order);
 
-  const isAlwaysKept = (key) => ALWAYS_KEEP_TAGS.includes(key);
+  const effectiveMime = isJpeg ? 'image/jpeg' : (mimeType || 'image/png');
+  const isAlwaysKept = (key) => isTagAlwaysKept(key, effectiveMime);
 
   return (
-    <div className="animate-fade-in-up">
+    <div className="animate-fade-in-up space-y-2">
       {!isJpeg && (
-        <div className="mx-4 mt-3 mb-2 flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 text-xs">
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 text-xs">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="10" />
             <line x1="12" y1="16" x2="12" y2="12" />
             <line x1="12" y1="8" x2="12.01" y2="8" />
           </svg>
-          Only full strip available for this format — selective tag removal is JPEG-only.
+          Orientation and selective tag removal are preserved for JPEG only. For other formats, color profiles are preserved and EXIF metadata is stripped.
         </div>
       )}
 
-      <div className="overflow-x-auto frame">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-ink-300 dark:border-ink-700">
-              <th className="text-left px-4 py-2.5 text-xs font-semibold text-ink-500 dark:text-ink-400 uppercase tracking-wider w-10">
-                Keep
-              </th>
-              <th className="text-left px-4 py-2.5 text-xs font-semibold text-ink-500 dark:text-ink-400 uppercase tracking-wider">
-                Tag
-              </th>
-              <th className="text-left px-4 py-2.5 text-xs font-semibold text-ink-500 dark:text-ink-400 uppercase tracking-wider">
-                Value
-              </th>
-              <th className="text-left px-4 py-2.5 text-xs font-semibold text-ink-500 dark:text-ink-400 uppercase tracking-wider w-36">
-                Status
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {sortedGroups.map(([group, { entries: groupEntries }]) => (
-              <GroupRows
-                key={group}
-                group={group}
-                entries={groupEntries}
-                keepTags={keepTags}
-                onToggleTag={onToggleTag}
-                isJpeg={isJpeg}
-                isAlwaysKept={isAlwaysKept}
-              />
-            ))}
-          </tbody>
-        </table>
+      {/* Search Input Box */}
+      <div className="relative">
+        <input
+          type="search"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Filter metadata tags (e.g. GPS, Date, Make, Camera)..."
+          aria-label="Filter metadata tags by name or value"
+          className="w-full pl-9 pr-9 py-2 text-xs rounded-md bg-white dark:bg-ink-900 border border-ink-300 dark:border-ink-700 text-ink-900 dark:text-ink-100 placeholder-ink-400 focus:outline-none focus:ring-2 focus:ring-safelight-500 shadow-sm"
+        />
+        <svg
+          className="absolute left-3 top-2.5 w-3.5 h-3.5 text-ink-400 pointer-events-none"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <circle cx="11" cy="11" r="8" />
+          <line x1="21" y1="21" x2="16.65" y2="16.65" />
+        </svg>
+        {searchQuery && (
+          <button
+            onClick={() => setSearchQuery('')}
+            className="absolute right-3 top-2 text-xs text-ink-400 hover:text-ink-700 dark:hover:text-ink-200"
+            aria-label="Clear search query"
+          >
+            ✕
+          </button>
+        )}
       </div>
+
+      {filteredEntries.length === 0 ? (
+        <div className="px-4 py-8 text-center text-sm text-ink-400 dark:text-ink-500 frame">
+          No metadata tags matching &ldquo;{searchQuery}&rdquo;.
+        </div>
+      ) : (
+        <div className="overflow-x-auto frame">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-ink-300 dark:border-ink-700">
+                <th className="text-left px-4 py-2.5 text-xs font-semibold text-ink-500 dark:text-ink-400 uppercase tracking-wider w-10">
+                  Keep
+                </th>
+                <th className="text-left px-4 py-2.5 text-xs font-semibold text-ink-500 dark:text-ink-400 uppercase tracking-wider">
+                  Tag
+                </th>
+                <th className="text-left px-4 py-2.5 text-xs font-semibold text-ink-500 dark:text-ink-400 uppercase tracking-wider">
+                  Value
+                </th>
+                <th className="text-left px-4 py-2.5 text-xs font-semibold text-ink-500 dark:text-ink-400 uppercase tracking-wider w-36">
+                  Status
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {sortedGroups.map(([group, { entries: groupEntries }]) => (
+                <GroupRows
+                  key={group}
+                  group={group}
+                  entries={groupEntries}
+                  keepTags={keepTags}
+                  onToggleTag={onToggleTag}
+                  isJpeg={isJpeg}
+                  isAlwaysKept={isAlwaysKept}
+                />
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
@@ -142,7 +194,8 @@ function GroupRows({ group, entries, keepTags, onToggleTag, isJpeg, isAlwaysKept
                 type="checkbox"
                 checked={kept}
                 disabled={checkboxDisabled}
-                onChange={() => onToggleTag(key)}
+                onChange={() => onToggleTag?.(key)}
+                aria-label={`Keep ${key}`}
                 className="w-4 h-4 rounded-sm border-ink-400 dark:border-ink-600 text-safelight-600 focus:ring-safelight-500 focus:ring-offset-0 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
               />
             </td>

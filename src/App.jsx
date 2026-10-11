@@ -5,16 +5,24 @@ import Header from './components/Header';
 import Dropzone from './components/Dropzone';
 import FileQueue from './components/FileQueue';
 import CleanButton from './components/CleanButton';
+import SeoContent from './components/SeoContent';
 import InstallPrompt from './components/InstallPrompt';
 import ErrorBoundary from './components/ErrorBoundary';
 import { createSafeThumbnail, MAX_FILES } from './utils/normalizeInput';
 import { readMetadata, getPrivacyLevel } from './utils/readMetadata';
+import { stripFull, stripSelective } from './utils/stripMetadata';
+import { downloadSingle } from './utils/zipDownload';
+import { getOutputFilename } from './utils/filenameUtils';
 
 let fileIdCounter = 0;
 
 export default function App() {
   // ─── File state ──────────────────────────────────────
   const [cleanFiles, setCleanFiles] = useState([]);
+  const [selectedId, setSelectedId] = useState(null);
+  const [fullSanitize, setFullSanitize] = useState(false);
+  const [sizeReport, setSizeReport] = useState(null);
+
   const cleanFilesRef = useRef([]);
   const cleanInFlightRef = useRef(0);
 
@@ -56,7 +64,6 @@ export default function App() {
   }, []);
 
   const handleCleanFilesAdded = useCallback(async (newFiles) => {
-    // Clamp to available slots in case called directly
     const availableSlots = Math.max(0, MAX_FILES - cleanFilesRef.current.length);
     const filesToAccept = newFiles.slice(0, availableSlots);
 
@@ -73,6 +80,9 @@ export default function App() {
         metadata: null,
         privacyLevel: 'low',
         keepTags: [],
+        status: 'READING', // 'READING' | 'IDLE' | 'PROCESSING' | 'CLEANED' | 'ERROR'
+        cleanedBlob: null,
+        cleanedName: null,
       }))
     );
 
@@ -88,24 +98,28 @@ export default function App() {
       return [...prev, ...itemsToAdd];
     });
 
+    // Auto-select first added file if none is selected
+    setSelectedId((current) => current || allowedItems[0]?.id || null);
+
+    // Read metadata for each file
     for (const item of allowedItems) {
       const controller = new AbortController();
       abortControllersRef.current.set(item.id, controller);
-      
+
       try {
         const metadata = await readMetadata(item.file, controller.signal);
         const privacyLevel = getPrivacyLevel(metadata);
-        
+
         setCleanFiles((prev) =>
           prev.map((f) =>
-            f.id === item.id ? { ...f, metadata, privacyLevel } : f
+            f.id === item.id ? { ...f, metadata, privacyLevel, status: 'IDLE' } : f
           )
         );
       } catch (err) {
         if (err.message !== 'CANCELLED') {
           setCleanFiles((prev) =>
             prev.map((f) =>
-              f.id === item.id ? { ...f, metadata: {}, privacyLevel: 'low' } : f
+              f.id === item.id ? { ...f, metadata: {}, privacyLevel: 'low', status: 'IDLE' } : f
             )
           );
         }
@@ -116,18 +130,45 @@ export default function App() {
   }, []);
 
   const handleCleanRemoveFile = useCallback((id) => {
-    // Abort if currently processing
     const controller = abortControllersRef.current.get(id);
     if (controller) {
       controller.abort();
       abortControllersRef.current.delete(id);
     }
-    
+
     setCleanFiles((prev) => {
       const item = prev.find((f) => f.id === id);
       if (item?.thumbnailUrl) URL.revokeObjectURL(item.thumbnailUrl);
-      return prev.filter((f) => f.id !== id);
+      const nextList = prev.filter((f) => f.id !== id);
+
+      // Adjust selected file if removing current selected
+      setSelectedId((currSelected) => {
+        if (currSelected === id) {
+          return nextList[0]?.id || null;
+        }
+        return currSelected;
+      });
+
+      return nextList;
     });
+  }, []);
+
+  const handleClearAll = useCallback(() => {
+    // Abort all in flight
+    for (const controller of abortControllersRef.current.values()) {
+      controller.abort();
+    }
+    abortControllersRef.current.clear();
+
+    // Revoke thumbnails
+    cleanFilesRef.current.forEach((item) => {
+      if (item.thumbnailUrl) URL.revokeObjectURL(item.thumbnailUrl);
+    });
+
+    setCleanFiles([]);
+    setSelectedId(null);
+    setSizeReport(null);
+    toast('Queue cleared', { icon: '🧹' });
   }, []);
 
   const handleToggleTag = useCallback((fileId, tag) => {
@@ -142,65 +183,158 @@ export default function App() {
     );
   }, []);
 
+  const handleCleanSingle = useCallback(async (fileId) => {
+    const item = cleanFilesRef.current.find((f) => f.id === fileId);
+    if (!item) return;
+
+    setCleanFiles((prev) =>
+      prev.map((f) => (f.id === fileId ? { ...f, status: 'PROCESSING' } : f))
+    );
+
+    const controller = new AbortController();
+    abortControllersRef.current.set(fileId, controller);
+
+    try {
+      let cleanedBlob;
+      const isJpeg = item.file.type === 'image/jpeg';
+
+      if (isJpeg && item.keepTags.length > 0) {
+        cleanedBlob = await stripSelective(item.file, item.keepTags, fullSanitize, null, controller.signal);
+      } else {
+        cleanedBlob = await stripFull(item.file, fullSanitize, null, controller.signal);
+      }
+
+      const outputName = getOutputFilename(item.file.name, cleanedBlob.type);
+
+      setCleanFiles((prev) =>
+        prev.map((f) =>
+          f.id === fileId
+            ? {
+                ...f,
+                status: 'CLEANED',
+                cleanedBlob,
+                cleanedName: outputName,
+                cleanedSize: cleanedBlob.size,
+              }
+            : f
+        )
+      );
+
+      toast.success(`"${item.file.name}" cleaned! Click SAVE to download.`);
+    } catch (err) {
+      if (err.message !== 'CANCELLED') {
+        toast.error(`Failed to clean "${item.file.name}": ${err.message || 'Error'}`);
+        setCleanFiles((prev) =>
+          prev.map((f) => (f.id === fileId ? { ...f, status: 'ERROR' } : f))
+        );
+      }
+    } finally {
+      abortControllersRef.current.delete(fileId);
+    }
+  }, [fullSanitize]);
+
+  const handleSaveSingle = useCallback((fileId) => {
+    const item = cleanFilesRef.current.find((f) => f.id === fileId);
+    if (!item || !item.cleanedBlob) {
+      toast.error('Cleaned file not found.');
+      return;
+    }
+    downloadSingle(item.cleanedName, item.cleanedBlob);
+  }, []);
+
+  const handleFilesCleaned = useCallback((cleanedResults) => {
+    const resultMap = new Map(cleanedResults.map((r) => [r.id, r]));
+    setCleanFiles((prev) =>
+      prev.map((f) => {
+        const res = resultMap.get(f.id);
+        if (res) {
+          return {
+            ...f,
+            status: 'CLEANED',
+            cleanedBlob: res.blob,
+            cleanedName: res.name,
+            cleanedSize: res.blob.size,
+          };
+        }
+        return f;
+      })
+    );
+  }, []);
+
   return (
     <ErrorBoundary onReset={() => window.location.reload()}>
-    <div className="min-h-screen flex flex-col">
-      <Toaster
-        position="top-right"
-        toastOptions={{
-          duration: 4000,
-          style: {
-            borderRadius: '12px',
-            background: 'var(--color-surface-800)',
-            color: '#fff',
-            fontSize: '14px',
-          },
-        }}
-      />
+      <div className="min-h-screen flex flex-col">
+        <Toaster
+          position="top-right"
+          toastOptions={{
+            duration: 4000,
+            style: {
+              borderRadius: '12px',
+              background: 'var(--color-surface-800)',
+              color: '#fff',
+              fontSize: '14px',
+            },
+          }}
+        />
 
-      <InstallPrompt />
+        <InstallPrompt />
 
-      <Header />
+        <Header />
 
-      <main className="flex-1 max-w-4xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-        <div className="text-center space-y-2 mb-2">
-          <h2 className="text-2xl sm:text-3xl font-bold text-surface-900 dark:text-white">
-            Clean your image metadata
-          </h2>
-          <p className="text-surface-500 dark:text-surface-400 max-w-lg mx-auto">
-            Remove GPS locations, device info, and other sensitive data from your photos.
-            Everything happens in your browser — nothing is uploaded.
-          </p>
-        </div>
+        <main className="flex-1 max-w-4xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+          <div className="text-center space-y-2 mb-2">
+            <h2 className="text-2xl sm:text-3xl font-bold text-surface-900 dark:text-white">
+              Clean your image metadata
+            </h2>
+            <p className="text-surface-500 dark:text-surface-400 max-w-lg mx-auto">
+              Remove GPS locations, device info, and other sensitive data from your photos.
+              Everything happens in your browser — nothing is uploaded.
+            </p>
+          </div>
 
-        <ErrorBoundary onReset={() => {
-          cleanFiles.forEach(f => { if (f.thumbnailUrl) URL.revokeObjectURL(f.thumbnailUrl); });
-          setCleanFiles([]);
-        }}>
-          <Dropzone
-            files={cleanFiles}
-            onFilesAdded={handleCleanFilesAdded}
-            onReserveSlots={reserveCleanSlots}
-            onReleaseSlots={releaseCleanSlots}
-          />
+          <ErrorBoundary onReset={handleClearAll}>
+            {/* Dropzone with SELECT FILES and CLEAR buttons */}
+            <Dropzone
+              files={cleanFiles}
+              onFilesAdded={handleCleanFilesAdded}
+              onReserveSlots={reserveCleanSlots}
+              onReleaseSlots={releaseCleanSlots}
+              onClearAll={handleClearAll}
+            />
 
-          <FileQueue
-            files={cleanFiles}
-            onRemoveFile={handleCleanRemoveFile}
-            onToggleTag={handleToggleTag}
-          />
+            {/* File Filmstrip and Metadata Inspector */}
+            <FileQueue
+              files={cleanFiles}
+              selectedId={selectedId}
+              onSelectFile={setSelectedId}
+              onRemoveFile={handleCleanRemoveFile}
+              onToggleTag={handleToggleTag}
+              onCleanSingle={handleCleanSingle}
+              onSaveSingle={handleSaveSingle}
+            />
 
-          <CleanButton files={cleanFiles} />
-        </ErrorBoundary>
+            {/* Clean All (Bulk Remove) / Save All / Full Sanitize / Size Report */}
+            <CleanButton
+              files={cleanFiles}
+              fullSanitize={fullSanitize}
+              onFullSanitizeChange={setFullSanitize}
+              onFilesCleaned={handleFilesCleaned}
+              sizeReport={sizeReport}
+              setSizeReport={setSizeReport}
+            />
+          </ErrorBoundary>
 
-        {/* Footer */}
-        <footer className="text-center pt-8 pb-4">
-          <p className="text-xs text-surface-400 dark:text-surface-600">
-            PixelTruth v2.0.0 — Image Metadata Remover
-          </p>
-        </footer>
-      </main>
-    </div>
+          {/* SEO Content & Comparison Guide */}
+          <SeoContent />
+
+          {/* Footer */}
+          <footer className="text-center pt-8 pb-4">
+            <p className="text-xs text-surface-400 dark:text-surface-600">
+              PixelTruth v2.0.0 — Image Metadata Remover
+            </p>
+          </footer>
+        </main>
+      </div>
     </ErrorBoundary>
   );
 }

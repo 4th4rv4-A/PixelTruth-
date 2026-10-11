@@ -9,11 +9,12 @@ function getOutputMime(file) {
 /**
  * Full strip — offloads image sanitization to Web Worker.
  * @param {File} file
+ * @param {boolean} [fullSanitize=false] If true, strips ICC profile too
  * @param {Function} [onProgress]
  * @param {AbortSignal} [signal]
  * @returns {Promise<Blob>}
  */
-export async function stripFull(file, preserveC2pa = false, onProgress, signal) {
+export async function stripFull(file, fullSanitize = false, onProgress, signal) {
   const buffer = await file.arrayBuffer();
   
   const result = await imagePool.dispatch('STRIP_METADATA', {
@@ -21,7 +22,7 @@ export async function stripFull(file, preserveC2pa = false, onProgress, signal) 
     mime: file.type,
     name: file.name,
     keepTags: [], // Empty means full strip
-    preserveC2pa,
+    fullSanitize,
   }, {
     transfer: [buffer],
     onProgress,
@@ -36,11 +37,12 @@ export async function stripFull(file, preserveC2pa = false, onProgress, signal) 
  * Selective strip — offloads image sanitization to Web Worker.
  * @param {File} file
  * @param {string[]} keepTags 
+ * @param {boolean} [fullSanitize=false]
  * @param {Function} [onProgress]
  * @param {AbortSignal} [signal]
  * @returns {Promise<Blob>}
  */
-export async function stripSelective(file, keepTags = [], preserveC2pa = false, onProgress, signal) {
+export async function stripSelective(file, keepTags = [], fullSanitize = false, onProgress, signal) {
   const buffer = await file.arrayBuffer();
   
   const result = await imagePool.dispatch('STRIP_METADATA', {
@@ -48,7 +50,7 @@ export async function stripSelective(file, keepTags = [], preserveC2pa = false, 
     mime: file.type,
     name: file.name,
     keepTags,
-    preserveC2pa,
+    fullSanitize,
   }, {
     transfer: [buffer],
     onProgress,

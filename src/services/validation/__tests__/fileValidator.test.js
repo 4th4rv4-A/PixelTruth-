@@ -167,4 +167,131 @@ describe('File Intake Security Pipeline', () => {
       expect(result.height).toBe(400);
     });
   });
+
+  describe('GIF Validation', () => {
+    it('parses valid GIF89a logical screen descriptor to get dimensions', async () => {
+      const bytes = new Uint8Array(16);
+      const sig = [0x47, 0x49, 0x46, 0x38, 0x39, 0x61];
+      for (let i = 0; i < sig.length; i++) bytes[i] = sig[i];
+      // width = 640 (0x0280 -> bytes 6, 7: 0x80, 0x02 little-endian)
+      bytes[6] = 0x80;
+      bytes[7] = 0x02;
+      // height = 480 (0x01E0 -> bytes 8, 9: 0xE0, 0x01 little-endian)
+      bytes[8] = 0xE0;
+      bytes[9] = 0x01;
+
+      const file = createFakeFile('test.gif', bytes.length, bytes);
+      const result = await validateHeaderSafety(file);
+
+      expect(result.valid).toBe(true);
+      expect(result.format).toBe('gif');
+      expect(result.mime).toBe('image/gif');
+      expect(result.width).toBe(640);
+      expect(result.height).toBe(480);
+    });
+
+    it('parses valid GIF87a logical screen descriptor', async () => {
+      const bytes = new Uint8Array(16);
+      const sig = [0x47, 0x49, 0x46, 0x38, 0x37, 0x61];
+      for (let i = 0; i < sig.length; i++) bytes[i] = sig[i];
+      // width = 320 (0x0140 -> 0x40, 0x01)
+      bytes[6] = 0x40;
+      bytes[7] = 0x01;
+      // height = 240 (0x00F0 -> 0xF0, 0x00)
+      bytes[8] = 0xF0;
+      bytes[9] = 0x00;
+
+      const file = createFakeFile('test87.gif', bytes.length, bytes);
+      const result = await validateHeaderSafety(file);
+
+      expect(result.valid).toBe(true);
+      expect(result.format).toBe('gif');
+      expect(result.width).toBe(320);
+      expect(result.height).toBe(240);
+    });
+
+    it('rejects GIF with missing dimensions (zero width/height)', async () => {
+      // 16 bytes to pass signature check, but width and height are 0
+      const bytes = new Uint8Array([
+        0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+      ]);
+      const file = createFakeFile('empty_dim.gif', bytes.length, bytes);
+      const result = await validateHeaderSafety(file);
+
+      expect(result.valid).toBe(false);
+      expect(result.reasons).toContain('DIMENSIONS_UNKNOWN');
+    });
+  });
+
+  describe('AVIF Validation', () => {
+    it('parses AVIF with majorBrand avif to find ispe dimensions', async () => {
+      const bytes = new Uint8Array(64);
+      let i = 0;
+
+      // ftyp box (len 16, brand 'avif')
+      bytes[i++] = 0; bytes[i++] = 0; bytes[i++] = 0; bytes[i++] = 16;
+      bytes[i++] = 0x66; bytes[i++] = 0x74; bytes[i++] = 0x79; bytes[i++] = 0x70; // ftyp
+      bytes[i++] = 0x61; bytes[i++] = 0x76; bytes[i++] = 0x69; bytes[i++] = 0x66; // avif
+      i += 4; // minor_version
+
+      // meta box (len 28)
+      bytes[i++] = 0; bytes[i++] = 0; bytes[i++] = 0; bytes[i++] = 28;
+      bytes[i++] = 0x6D; bytes[i++] = 0x65; bytes[i++] = 0x74; bytes[i++] = 0x61; // meta
+      i += 4; // version/flags
+
+      // ispe box inside meta (len 16)
+      bytes[i++] = 0; bytes[i++] = 0; bytes[i++] = 0; bytes[i++] = 16;
+      bytes[i++] = 0x69; bytes[i++] = 0x73; bytes[i++] = 0x70; bytes[i++] = 0x65; // ispe
+      i += 4; // version/flags
+      // width = 1920 (0x00000780)
+      bytes[i++] = 0; bytes[i++] = 0; bytes[i++] = 0x07; bytes[i++] = 0x80;
+      // height = 1080 (0x00000438)
+      bytes[i++] = 0; bytes[i++] = 0; bytes[i++] = 0x04; bytes[i++] = 0x38;
+
+      const file = createFakeFile('test.avif', bytes.length, bytes);
+      const result = await validateHeaderSafety(file);
+
+      expect(result.valid).toBe(true);
+      expect(result.format).toBe('avif');
+      expect(result.mime).toBe('image/avif');
+      expect(result.width).toBe(1920);
+      expect(result.height).toBe(1080);
+    });
+
+    it('parses AVIF with compatible brand avif', async () => {
+      const bytes = new Uint8Array(68);
+      let i = 0;
+
+      // ftyp box (len 20, majorBrand 'mif1', compatible brand 'avif')
+      bytes[i++] = 0; bytes[i++] = 0; bytes[i++] = 0; bytes[i++] = 20;
+      bytes[i++] = 0x66; bytes[i++] = 0x74; bytes[i++] = 0x79; bytes[i++] = 0x70; // ftyp
+      bytes[i++] = 0x6D; bytes[i++] = 0x69; bytes[i++] = 0x66; bytes[i++] = 0x31; // mif1
+      i += 4; // minor_version
+      bytes[i++] = 0x61; bytes[i++] = 0x76; bytes[i++] = 0x69; bytes[i++] = 0x66; // avif compatible brand
+
+      // meta box (len 28)
+      bytes[i++] = 0; bytes[i++] = 0; bytes[i++] = 0; bytes[i++] = 28;
+      bytes[i++] = 0x6D; bytes[i++] = 0x65; bytes[i++] = 0x74; bytes[i++] = 0x61; // meta
+      i += 4; // version/flags
+
+      // ispe box inside meta (len 16)
+      bytes[i++] = 0; bytes[i++] = 0; bytes[i++] = 0; bytes[i++] = 16;
+      bytes[i++] = 0x69; bytes[i++] = 0x73; bytes[i++] = 0x70; bytes[i++] = 0x65; // ispe
+      i += 4; // version/flags
+      // width = 800
+      bytes[i++] = 0; bytes[i++] = 0; bytes[i++] = 0x03; bytes[i++] = 0x20;
+      // height = 600
+      bytes[i++] = 0; bytes[i++] = 0; bytes[i++] = 0x02; bytes[i++] = 0x58;
+
+      const file = createFakeFile('compatible.avif', bytes.length, bytes);
+      const result = await validateHeaderSafety(file);
+
+      expect(result.valid).toBe(true);
+      expect(result.format).toBe('avif');
+      expect(result.mime).toBe('image/avif');
+      expect(result.width).toBe(800);
+      expect(result.height).toBe(600);
+    });
+  });
 });

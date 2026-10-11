@@ -42,9 +42,26 @@ export function getPrivacyLevel(metadata) {
 }
 
 /**
- * Tags that should always be preserved for correct image rendering.
+ * Whitelist of tags preserved by format during lossless stripping.
+ * - JPEG preserves Orientation, ColorSpace, and ICC_Profile (APP2).
+ * - PNG / WebP preserve ICC_Profile (iCCP / ICCP chunk).
  */
+export const PRESERVED_TAGS_BY_MIME = {
+  'image/jpeg': ['Orientation', 'ColorSpace', 'ICC_Profile'],
+  'image/png': ['ICC_Profile'],
+  'image/webp': ['ICC_Profile'],
+};
+
 export const ALWAYS_KEEP_TAGS = ['Orientation', 'ColorSpace', 'ICC_Profile'];
+
+/**
+ * Checks whether a tag is guaranteed to be preserved for the given MIME type / format.
+ */
+export function isTagAlwaysKept(tag, mimeType = 'image/jpeg') {
+  const allowed = PRESERVED_TAGS_BY_MIME[mimeType] || ['ICC_Profile'];
+  return allowed.includes(tag);
+}
+
 
 /**
  * Tags considered sensitive / privacy-relevant.
