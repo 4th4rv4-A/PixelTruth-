@@ -134,8 +134,12 @@ export default function App() {
           })
           .catch(() => {
             /* no credentials, decode error, or cancelled — rows stay empty */
+          })
+          .finally(() => {
+            abortControllersRef.current.delete(item.id);
           });
       } catch (err) {
+        abortControllersRef.current.delete(item.id);
         if (err.message !== 'CANCELLED') {
           setCleanFiles((prev) =>
             prev.map((f) =>
@@ -143,8 +147,6 @@ export default function App() {
             )
           );
         }
-      } finally {
-        abortControllersRef.current.delete(item.id);
       }
     }
   }, []);

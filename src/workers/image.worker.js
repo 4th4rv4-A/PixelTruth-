@@ -35,12 +35,12 @@ async function drawToOffscreenCanvas(blob, mimeType) {
   return outBlob;
 }
 
-function isHeicName(name) {
-  return /\.hei[cf]$/i.test(name);
+function isHeic(name, mime) {
+  return /\.hei[cf]$/i.test(name || '') || mime === 'image/heic' || mime === 'image/heif';
 }
 
-async function ensureDecodable(blob, name) {
-  if (!isHeicName(name)) {
+async function ensureDecodable(blob, name, mime) {
+  if (!isHeic(name, mime || blob?.type)) {
     return blob;
   }
 
@@ -136,7 +136,7 @@ async function handleStripMetadata(payload, postProgress) {
       if (result.status === 'success' && result.outputBlob) {
         return await result.outputBlob.arrayBuffer();
       }
-      if (result.status === 'unsupported' || (!isHeicName(name) && result.status !== 'success')) {
+      if (result.status === 'unsupported' || (!isHeic(name, mime) && result.status !== 'success')) {
         const errorMsg = result.status === 'unsupported'
           ? 'Metadata removal not supported for this format (lossless carver unavailable)'
           : (result.error || 'Lossless metadata removal failed');
@@ -146,7 +146,7 @@ async function handleStripMetadata(payload, postProgress) {
       if (err.message && err.message.includes('not supported for this format')) {
         throw err;
       }
-      if (!isHeicName(name)) {
+      if (!isHeic(name, mime)) {
         throw new Error(`Lossless metadata removal failed: ${err.message || 'unknown error'}`);
       }
       console.warn('Lossless strip failed in worker, falling back for HEIC.', err);
@@ -156,7 +156,7 @@ async function handleStripMetadata(payload, postProgress) {
   // Fallback or Selective
   postProgress('PARSING');
   let blob = new Blob([buffer], { type: mime });
-  blob = await ensureDecodable(blob, name);
+  blob = await ensureDecodable(blob, name, mime);
   const outMime = getOutputMime(blob.type || mime);
 
 

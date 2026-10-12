@@ -74,7 +74,7 @@ export default function FileQueue({
                 <PrivacyBadge level={selectedItem.privacyLevel} />
               </div>
               <p className="text-xs text-ink-500 dark:text-ink-400">
-                {selectedItem.file.type || 'Unknown format'} • {selectedItem.metadata ? Object.keys(selectedItem.metadata).length : 0} tags detected
+                {selectedItem.file.type || 'Unknown format'} • {selectedItem.metadata ? Object.keys(selectedItem.metadata).filter((k) => !k.startsWith('__')).length : 0} tags detected
               </p>
             </div>
 

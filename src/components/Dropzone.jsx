@@ -68,6 +68,12 @@ export default function Dropzone({
           continue;
         }
 
+        if (!['jpeg', 'png', 'webp', 'heic'].includes(result.format)) {
+          toast.error(`"${file.name}" — unsupported format. Use JPEG, PNG, WebP, or HEIC.`);
+          release(1);
+          continue;
+        }
+
         validFiles.push(file);
       }
 

@@ -18,6 +18,9 @@ export async function readMetadata(file, signal) {
     
     return result || {};
   } catch (err) {
+    if (err.message === 'CANCELLED') {
+      throw err;
+    }
     console.warn(`[PixelTruth] readMetadata failed for ${file.name}:`, err);
     return {};
   }

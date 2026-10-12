@@ -23,7 +23,7 @@ test.describe('Real-World User Flows', () => {
     await expect(page.locator('text=Contains GPS location').first()).toBeVisible();
 
     // 4. Verify tag detection count
-    await expect(page.locator('text=27 tags detected')).toBeVisible();
+    await expect(page.locator('text=26 tags detected')).toBeVisible();
 
     // 5. Test search filter
     const searchInput = page.locator('input[aria-label="Filter metadata tags by name or value"]');
