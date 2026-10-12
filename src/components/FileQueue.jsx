@@ -144,34 +144,31 @@ function FileFrame({ item, isSelected, onSelect, onRemove, onCleanSingle, onSave
 
   return (
     <div
-      role="button"
-      tabIndex={0}
-      aria-label={`Inspect metadata for ${item.file.name}`}
-      aria-expanded={isSelected}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          onSelect();
-        }
-      }}
-      className={`relative flex-shrink-0 w-36 h-40 frame overflow-hidden cursor-pointer snap-start transition-all focus:outline-none focus:ring-2 focus:ring-safelight-500 ${
+      className={`relative flex-shrink-0 w-36 h-40 frame overflow-hidden snap-start transition-all ${
         isSelected ? 'ring-2 ring-safelight-500 border-safelight-500' : 'hover:border-ink-400'
       }`}
-      onClick={onSelect}
     >
-      {/* Thumbnail */}
-      <div className="w-full h-[76px] bg-ink-200 dark:bg-ink-800">
-        <img
-          src={item.thumbnailUrl}
-          alt={item.file.name}
-          className="w-full h-full object-cover"
-          loading="lazy"
-        />
-      </div>
+      {/* Clickable Inspection Area */}
+      <button
+        type="button"
+        role="button"
+        aria-label={`Inspect metadata for ${item.file.name}`}
+        aria-expanded={isSelected}
+        onClick={onSelect}
+        className="w-full text-left focus:outline-none focus:ring-2 focus:ring-safelight-500 rounded-sm cursor-pointer"
+      >
+        {/* Thumbnail */}
+        <div className="w-full h-[76px] bg-ink-200 dark:bg-ink-800">
+          <img
+            src={item.thumbnailUrl}
+            alt={item.file.name}
+            className="w-full h-full object-cover"
+            loading="lazy"
+          />
+        </div>
 
-      {/* Caption strip */}
-      <div className="p-2 flex flex-col justify-between h-[84px] bg-ink-50 dark:bg-ink-900 border-t border-ink-200 dark:border-ink-800">
-        <div>
+        {/* Caption strip */}
+        <div className="p-2 h-[48px] bg-ink-50 dark:bg-ink-900 border-t border-ink-200 dark:border-ink-800">
           <p className="text-[10px] font-medium text-ink-800 dark:text-ink-200 truncate" title={item.file.name}>
             {item.file.name}
           </p>
@@ -179,58 +176,52 @@ function FileFrame({ item, isSelected, onSelect, onRemove, onCleanSingle, onSave
             {formatFileSize(item.file.size)}
           </p>
         </div>
+      </button>
 
-        {/* State chip / action button */}
-        <div className="mt-1 flex items-center justify-between">
-          {isReading ? (
-            <span className="inline-flex items-center gap-1 text-[9px] font-semibold text-ink-500 dark:text-ink-400">
-              <span className="w-2.5 h-2.5 rounded-full border border-current border-t-transparent animate-spin" />
-              READING…
-            </span>
-          ) : isProcessing ? (
-            <span className="inline-flex items-center gap-1 text-[9px] font-semibold text-safelight-500">
-              <span className="w-2.5 h-2.5 rounded-full border border-current border-t-transparent animate-spin" />
-              CLEANING…
-            </span>
-          ) : isCleaned ? (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onSaveSingle();
-              }}
-              className="px-2 py-0.5 rounded text-[9px] font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs transition-colors"
-              aria-label={`Save ${item.file.name}`}
-            >
-              SAVE
-            </button>
-          ) : isError ? (
-            <span className="text-[9px] font-bold text-red-500">
-              ERROR
-            </span>
-          ) : (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onCleanSingle();
-              }}
-              className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-ink-200 hover:bg-safelight-600 hover:text-white dark:bg-ink-800 text-ink-700 dark:text-ink-300 transition-colors"
-              aria-label={`Remove EXIF from ${item.file.name}`}
-            >
-              REMOVE EXIF
-            </button>
-          )}
+      {/* State chip / action button (Sibling, not nested) */}
+      <div className="absolute bottom-0 left-0 right-0 px-2 pb-1.5 pt-0.5 flex items-center justify-between bg-ink-50 dark:bg-ink-900">
+        {isReading ? (
+          <span className="inline-flex items-center gap-1 text-[9px] font-semibold text-ink-500 dark:text-ink-400">
+            <span className="w-2.5 h-2.5 rounded-full border border-current border-t-transparent animate-spin" />
+            READING…
+          </span>
+        ) : isProcessing ? (
+          <span className="inline-flex items-center gap-1 text-[9px] font-semibold text-safelight-500">
+            <span className="w-2.5 h-2.5 rounded-full border border-current border-t-transparent animate-spin" />
+            CLEANING…
+          </span>
+        ) : isCleaned ? (
+          <button
+            type="button"
+            onClick={onSaveSingle}
+            className="px-2 py-0.5 rounded text-[9px] font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs transition-colors cursor-pointer"
+            aria-label={`Save ${item.file.name}`}
+          >
+            SAVE
+          </button>
+        ) : isError ? (
+          <span className="text-[9px] font-bold text-red-500">
+            ERROR
+          </span>
+        ) : (
+          <button
+            type="button"
+            onClick={onCleanSingle}
+            className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-ink-200 hover:bg-safelight-600 hover:text-white dark:bg-ink-800 text-ink-700 dark:text-ink-300 transition-colors cursor-pointer"
+            aria-label={`Remove EXIF from ${item.file.name}`}
+          >
+            REMOVE EXIF
+          </button>
+        )}
 
-          <PrivacyBadge level={item.privacyLevel} />
-        </div>
+        <PrivacyBadge level={item.privacyLevel} />
       </div>
 
-      {/* Remove button */}
+      {/* Remove button (Sibling, not nested) */}
       <button
-        onClick={(e) => {
-          e.stopPropagation();
-          onRemove();
-        }}
-        className="absolute top-0 right-0 w-6 h-6 bg-ink-950/70 hover:bg-safelight-500 text-ink-100 flex items-center justify-center rounded-bl-sm transition-colors backdrop-blur-sm"
+        type="button"
+        onClick={onRemove}
+        className="absolute top-0 right-0 w-6 h-6 bg-ink-950/70 hover:bg-safelight-500 text-ink-100 flex items-center justify-center rounded-bl-sm transition-colors backdrop-blur-sm cursor-pointer"
         aria-label={`Remove ${item.file.name}`}
       >
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">

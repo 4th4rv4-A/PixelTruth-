@@ -17,9 +17,11 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: {
+        ...devices['Desktop Chrome'],
+        channel: 'msedge',
+      },
     },
-    // Keep it fast for now; CI can run cross-browser if configured
   ],
   webServer: {
     command: 'npm run dev',

@@ -1,5 +1,8 @@
+if (typeof window === 'undefined') {
+  self.window = self;
+}
+
 import piexif from 'piexifjs';
-import heic2any from 'heic2any';
 import exifr from 'exifr';
 import { sanitizeImage } from '../services/binary/index';
 
@@ -41,6 +44,7 @@ async function ensureDecodable(blob, name) {
     return blob;
   }
 
+  const { default: heic2any } = await import('heic2any');
   const converted = await heic2any({
     blob,
     toType: 'image/jpeg',
