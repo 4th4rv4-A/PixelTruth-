@@ -29,7 +29,7 @@ export default defineConfig({
         // Precache app shell; keep *.wasm guard to prevent future dependencies from
         // silently precaching multi-megabyte binaries
         globPatterns: ['**/*.{js,css,html,svg,png}'],
-        globIgnores: ['**/inline-*.js', '**/*.wasm'],
+        globIgnores: ['**/inline-*.js', '**/*.wasm', '**/c2pa.worker-*.js', '**/c2pa_worker-*.js'],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
       },
     }),

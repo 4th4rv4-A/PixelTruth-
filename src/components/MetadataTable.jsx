@@ -25,6 +25,22 @@ function formatValue(value) {
 }
 
 /**
+ * Human-friendly formatting for JFIF header tags (as shown by exifremover.com).
+ * Returns null when no special formatting applies.
+ */
+function formatJfif(key, value) {
+  if (key === 'JFIFVersion' && typeof value === 'number') {
+    const major = (value >> 8) & 0xff;
+    const minor = value & 0xff;
+    return `${major}.${String(minor).padStart(2, '0')}`; // 257 -> "1.01"
+  }
+  if (key === 'ResolutionUnit' && typeof value === 'number') {
+    return ['None', 'inches', 'cm'][value] ?? String(value); // 0 -> "None"
+  }
+  return null;
+}
+
+/**
  * Categorize tags for display grouping.
  */
 function categorize(key) {
@@ -32,7 +48,7 @@ function categorize(key) {
   const device = ['Make', 'Model', 'LensMake', 'LensModel', 'Software', 'HostComputer', 'SerialNumber', 'LensSerialNumber'];
   const datetime = ['DateTimeOriginal', 'DateTimeDigitized', 'CreateDate', 'ModifyDate', 'DateTime'];
   const personal = ['Artist', 'Copyright', 'OwnerName', 'ImageDescription', 'UserComment'];
-  const rendering = ['Orientation', 'ColorSpace', 'ICC_Profile', 'ExifImageWidth', 'ExifImageHeight', 'XResolution', 'YResolution'];
+  const rendering = ['Orientation', 'ColorSpace', 'ICC_Profile', 'ExifImageWidth', 'ExifImageHeight', 'XResolution', 'YResolution', 'JFIFVersion', 'ResolutionUnit'];
 
   if (gps.includes(key)) return { group: '📍 GPS / Location', order: 0 };
   if (device.includes(key)) return { group: '📱 Device Info', order: 1 };
@@ -45,11 +61,13 @@ function categorize(key) {
 export default function MetadataTable({ metadata = {}, keepTags = [], onToggleTag, isJpeg, mimeType }) {
   const [searchQuery, setSearchQuery] = useState('');
 
-  const entries = Object.entries(metadata).filter(
-    ([, value]) => value !== undefined && value !== null && value !== ''
-  );
+  const c2paRows = Array.isArray(metadata.__c2pa) ? metadata.__c2pa : [];
 
-  if (entries.length === 0) {
+  const entries = Object.entries(metadata)
+    .filter(([key, value]) => !key.startsWith('__') && value !== undefined && value !== null && value !== '')
+    .map(([key, value]) => [key, formatJfif(key, value) ?? value]);
+
+  if (entries.length === 0 && c2paRows.length === 0) {
     return (
       <div className="px-4 py-8 text-center text-sm text-ink-400 dark:text-ink-500 frame">
         No metadata found in this file.
@@ -124,6 +142,24 @@ export default function MetadataTable({ metadata = {}, keepTags = [], onToggleTa
           </button>
         )}
       </div>
+
+      {c2paRows.length > 0 && (
+        <div className="frame p-4">
+          <h3 className="text-xs font-semibold text-violet-600 dark:text-violet-400 uppercase tracking-wider mb-2">
+            Content Credentials (C2PA) — cryptographically inspected
+          </h3>
+          <table className="w-full text-sm">
+            <tbody>
+              {c2paRows.map(([tag, value], i) => (
+                <tr key={i} className="border-b border-ink-200 dark:border-ink-800">
+                  <td className="px-2 py-1.5 font-mono text-xs text-ink-700 dark:text-ink-300 align-top whitespace-nowrap pr-4">{tag}</td>
+                  <td className="px-2 py-1.5 text-ink-600 dark:text-ink-400 break-all">{value}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {filteredEntries.length === 0 ? (
         <div className="px-4 py-8 text-center text-sm text-ink-400 dark:text-ink-500 frame">

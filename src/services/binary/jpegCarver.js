@@ -17,6 +17,7 @@ const textEncoder = new TextEncoder();
 const EXIF_SIG = textEncoder.encode("Exif\0\0");
 const XMP_SIG = textEncoder.encode("http://ns.adobe.com/xap/1.0/\0");
 const ICC_SIG = textEncoder.encode("ICC_PROFILE\0");
+const JUMBF_SIG = textEncoder.encode("JUMBF");
 
 function bufferStartsWith(buffer, offset, signature) {
   if (offset + signature.length > buffer.length) return false;
@@ -357,6 +358,18 @@ export function sanitizeJpeg(inputBytes, policy = {}) {
     } else if (marker === MARKERS.APP13 || marker === MARKERS.APP14) {
       typeDesc = `APP${marker - 0xE0}`;
       if (policy.removeIptc && marker === MARKERS.APP13) keep = false;
+    } else if (marker === MARKERS.APP11) {
+      // APP11 almost always carries a C2PA / JUMBF Content Credentials manifest.
+      if (
+        bufferStartsWith(inputBytes, payloadOffset + 4, JUMBF_SIG) ||
+        bufferStartsWith(inputBytes, payloadOffset + 8, JUMBF_SIG) ||
+        bufferStartsWith(inputBytes, payloadOffset + 12, JUMBF_SIG)
+      ) {
+        typeDesc = 'APP11_C2PA';
+        if (policy.removeC2pa) keep = false;
+      } else {
+        typeDesc = 'APP11_UNKNOWN';
+      }
     } else if (marker >= 0xE0 && marker <= 0xEF) {
       typeDesc = `APP${marker - 0xE0}`;
     }

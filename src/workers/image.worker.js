@@ -99,6 +99,7 @@ async function handleReadMetadata(payload) {
     xmp: true,
     icc: true,
     iptc: true,
+    jfif: true,
   });
   return metadata;
 }

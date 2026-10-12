@@ -412,4 +412,36 @@ describe('Binary Sanitizer Engine', () => {
       expect(result.status).toBe('unsupported');
     });
   });
+
+  describe('C2PA / JUMBF (APP11) stripping', () => {
+    function jpegWithJumbf() {
+      const manifest = new TextEncoder().encode(
+        '\x00\x00\x00\x00JUMBFc2pa{"claim_generator":"Google C2PA Core Generator Library"}'
+      );
+      const len = 2 + manifest.length;
+      const app11 = new Uint8Array(2 + len);
+      app11[0] = 0xff; app11[1] = 0xeb;
+      app11[2] = (len >> 8) & 0xff; app11[3] = len & 0xff;
+      app11.set(manifest, 4);
+      const sos = new Uint8Array([0xff, 0xda, 0x00, 0x04, 0x11, 0x22, 0xff, 0xd9]);
+      const out = new Uint8Array(2 + app11.length + sos.length);
+      out[0] = 0xff; out[1] = 0xd8;
+      out.set(app11, 2);
+      out.set(sos, 2 + app11.length);
+      return out;
+    }
+
+    it('strips APP11 C2PA by default (always_strip)', () => {
+      const result = sanitizeImage(jpegWithJumbf(), {});
+      expect(result.status).toBe('success');
+      expect(result.removedSegments.some((s) => s.type === 'APP11_C2PA')).toBe(true);
+      expect(result.preservedSegments.some((s) => s.type === 'APP11_C2PA')).toBe(false);
+    });
+
+    it('preserves APP11 C2PA when removeC2pa is false', () => {
+      const result = sanitizeImage(jpegWithJumbf(), { removeC2pa: false });
+      expect(result.status).toBe('success');
+      expect(result.preservedSegments.some((s) => s.type === 'APP11_C2PA')).toBe(true);
+    });
+  });
 });

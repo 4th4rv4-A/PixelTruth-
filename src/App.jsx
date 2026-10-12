@@ -13,6 +13,7 @@ import { readMetadata, getPrivacyLevel } from './utils/readMetadata';
 import { stripFull, stripSelective } from './utils/stripMetadata';
 import { downloadSingle } from './utils/zipDownload';
 import { getOutputFilename } from './utils/filenameUtils';
+import { readC2paManifest, flattenC2paRows } from './utils/c2paRows';
 
 let fileIdCounter = 0;
 
@@ -110,16 +111,35 @@ export default function App() {
         const metadata = await readMetadata(item.file, controller.signal);
         const privacyLevel = getPrivacyLevel(metadata);
 
+        // Render EXIF/JFIF rows immediately. Content Credentials (C2PA) hydrate
+        // separately below so the heavy WASM read never blocks the metadata table.
         setCleanFiles((prev) =>
           prev.map((f) =>
-            f.id === item.id ? { ...f, metadata, privacyLevel, status: 'IDLE' } : f
+            f.id === item.id
+              ? { ...f, metadata: { ...metadata, __c2pa: [] }, privacyLevel, status: 'IDLE' }
+              : f
           )
         );
+
+        // Content Credentials (C2PA) — lazy and non-blocking, mirroring exifremover.com.
+        readC2paManifest(item.file, controller.signal)
+          .then((manifest) => {
+            const rows = flattenC2paRows(manifest);
+            if (!rows.length) return;
+            setCleanFiles((prev) =>
+              prev.map((f) =>
+                f.id === item.id ? { ...f, metadata: { ...f.metadata, __c2pa: rows } } : f
+              )
+            );
+          })
+          .catch(() => {
+            /* no credentials, decode error, or cancelled — rows stay empty */
+          });
       } catch (err) {
         if (err.message !== 'CANCELLED') {
           setCleanFiles((prev) =>
             prev.map((f) =>
-              f.id === item.id ? { ...f, metadata: {}, privacyLevel: 'low', status: 'IDLE' } : f
+              f.id === item.id ? { ...f, metadata: { __c2pa: [] }, privacyLevel: 'low', status: 'IDLE' } : f
             )
           );
         }

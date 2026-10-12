@@ -24,6 +24,8 @@ export function validatePolicy(policy = {}) {
     removeIcc: policy.removeIcc ?? (isFullSanitize ? true : false),
     preserveOrientation: policy.preserveOrientation ?? true,
     preserveColorSpace: policy.preserveColorSpace ?? true,
+    // C2PA / JUMBF Content Credentials are stripped by default on every clean.
+    removeC2pa: policy.removeC2pa ?? true,
     fullSanitize: isFullSanitize,
   };
 
