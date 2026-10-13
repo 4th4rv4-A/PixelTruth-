@@ -26,6 +26,8 @@ export const MAX_PIXELS = 64 * 1024 * 1024;
 
 export { validateHeaderSafety } from '../services/validation/fileValidator.js';
 
+import { isHeic } from './filenameUtils';
+
 /**
  * Helper to safely generate a thumbnail, converting HEIC to a cheap JPEG if needed.
  * Returns the object URL. Does NOT mutate the original file.
@@ -33,13 +35,7 @@ export { validateHeaderSafety } from '../services/validation/fileValidator.js';
  * @returns {Promise<string>}
  */
 export async function createSafeThumbnail(file) {
-  const isHeic =
-    file.type === 'image/heic' ||
-    file.type === 'image/heif' ||
-    /\.heic$/i.test(file.name) ||
-    /\.heif$/i.test(file.name);
-
-  if (!isHeic) {
+  if (!isHeic(file)) {
     return URL.createObjectURL(file);
   }
 
@@ -59,3 +55,4 @@ export async function createSafeThumbnail(file) {
     return '';
   }
 }
+

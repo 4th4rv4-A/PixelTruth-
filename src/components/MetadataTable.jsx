@@ -116,6 +116,11 @@ export default function MetadataTable({ metadata = {}, keepTags = [], onToggleTa
           type="search"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              setSearchQuery('');
+            }
+          }}
           placeholder="Filter metadata tags (e.g. GPS, Date, Make, Camera)..."
           aria-label="Filter metadata tags by name or value"
           className="w-full pl-9 pr-9 py-2 text-xs rounded-md bg-white dark:bg-ink-900 border border-ink-300 dark:border-ink-700 text-ink-900 dark:text-ink-100 placeholder-ink-400 focus:outline-none focus:ring-2 focus:ring-safelight-500 shadow-sm"
@@ -135,7 +140,7 @@ export default function MetadataTable({ metadata = {}, keepTags = [], onToggleTa
         {searchQuery && (
           <button
             onClick={() => setSearchQuery('')}
-            className="absolute right-3 top-2 text-xs text-ink-400 hover:text-ink-700 dark:hover:text-ink-200"
+            className="absolute right-3 top-2 text-xs text-ink-400 hover:text-ink-700 dark:hover:text-ink-200 cursor-pointer"
             aria-label="Clear search query"
           >
             ✕
@@ -170,16 +175,16 @@ export default function MetadataTable({ metadata = {}, keepTags = [], onToggleTa
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-ink-300 dark:border-ink-700">
-                <th className="text-left px-4 py-2.5 text-xs font-semibold text-ink-500 dark:text-ink-400 uppercase tracking-wider w-10">
+                <th scope="col" className="text-left px-4 py-2.5 text-xs font-semibold text-ink-500 dark:text-ink-400 uppercase tracking-wider w-10">
                   Keep
                 </th>
-                <th className="text-left px-4 py-2.5 text-xs font-semibold text-ink-500 dark:text-ink-400 uppercase tracking-wider">
+                <th scope="col" className="text-left px-4 py-2.5 text-xs font-semibold text-ink-500 dark:text-ink-400 uppercase tracking-wider">
                   Tag
                 </th>
-                <th className="text-left px-4 py-2.5 text-xs font-semibold text-ink-500 dark:text-ink-400 uppercase tracking-wider">
+                <th scope="col" className="text-left px-4 py-2.5 text-xs font-semibold text-ink-500 dark:text-ink-400 uppercase tracking-wider">
                   Value
                 </th>
-                <th className="text-left px-4 py-2.5 text-xs font-semibold text-ink-500 dark:text-ink-400 uppercase tracking-wider w-36">
+                <th scope="col" className="text-left px-4 py-2.5 text-xs font-semibold text-ink-500 dark:text-ink-400 uppercase tracking-wider w-36">
                   Status
                 </th>
               </tr>

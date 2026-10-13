@@ -1,12 +1,19 @@
 import { useState, useEffect } from 'react';
 
-export default function Header() {
-  const [dark, setDark] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('pixeltruth-theme') === 'dark';
-    }
+function getInitialTheme() {
+  if (typeof window === 'undefined') return false;
+  try {
+    const saved = localStorage.getItem('pixeltruth-theme');
+    if (saved === 'dark') return true;
+    if (saved === 'light') return false;
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  } catch {
     return false;
-  });
+  }
+}
+
+export default function Header() {
+  const [dark, setDark] = useState(getInitialTheme);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -15,7 +22,11 @@ export default function Header() {
     } else {
       root.classList.remove('dark');
     }
-    localStorage.setItem('pixeltruth-theme', dark ? 'dark' : 'light');
+    try {
+      localStorage.setItem('pixeltruth-theme', dark ? 'dark' : 'light');
+    } catch {
+      // ignore storage access errors in private/sandboxed mode
+    }
   }, [dark]);
 
   return (

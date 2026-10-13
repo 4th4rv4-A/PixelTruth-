@@ -60,3 +60,23 @@ export async function stripSelective(file, keepTags = [], fullSanitize = false, 
   const mimeType = getOutputMime(file);
   return new Blob([result.buffer], { type: mimeType });
 }
+
+/**
+ * Unified image cleaning function that routes between selective or full metadata stripping.
+ * @param {File} file
+ * @param {Object} [options]
+ * @param {string[]} [options.keepTags=[]]
+ * @param {boolean} [options.fullSanitize=false]
+ * @param {Function} [options.onProgress]
+ * @param {AbortSignal} [options.signal]
+ * @returns {Promise<Blob>}
+ */
+export async function cleanImageFile(file, options = {}) {
+  const { keepTags = [], fullSanitize = false, onProgress, signal } = options;
+  const isJpeg = file.type === 'image/jpeg';
+  if (isJpeg && keepTags.length > 0) {
+    return stripSelective(file, keepTags, fullSanitize, onProgress, signal);
+  }
+  return stripFull(file, fullSanitize, onProgress, signal);
+}
+

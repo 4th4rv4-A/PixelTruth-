@@ -1,11 +1,6 @@
 import PrivacyBadge from './PrivacyBadge';
 import MetadataTable from './MetadataTable';
-
-function formatFileSize(bytes) {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
+import { formatSize } from '../utils/sizeUtils';
 
 export default function FileQueue({
   files,
@@ -39,7 +34,7 @@ export default function FileQueue({
 
       {/* Filmstrip */}
       <div className="bg-ink-900 p-2 rounded-sm border border-ink-800">
-        <div className="frame-sprocket w-full"></div>
+        <div className="frame-sprocket w-full" aria-hidden="true" />
 
         <div className="flex overflow-x-auto gap-4 py-3 snap-x pb-4">
           {files.map((item) => (
@@ -55,7 +50,7 @@ export default function FileQueue({
           ))}
         </div>
 
-        <div className="frame-sprocket w-full"></div>
+        <div className="frame-sprocket w-full" aria-hidden="true" />
       </div>
 
       {/* Selected file detail header and metadata table */}
@@ -69,7 +64,7 @@ export default function FileQueue({
                   {selectedItem.file.name}
                 </span>
                 <span className="text-xs px-2 py-0.5 rounded bg-ink-100 dark:bg-ink-800 text-ink-600 dark:text-ink-400 font-mono">
-                  {formatFileSize(selectedItem.file.size)}
+                  {formatSize(selectedItem.file.size)}
                 </span>
                 <PrivacyBadge level={selectedItem.privacyLevel} />
               </div>
@@ -173,7 +168,7 @@ function FileFrame({ item, isSelected, onSelect, onRemove, onCleanSingle, onSave
             {item.file.name}
           </p>
           <p className="text-[9px] text-ink-500 dark:text-ink-400 mt-0.5">
-            {formatFileSize(item.file.size)}
+            {formatSize(item.file.size)}
           </p>
         </div>
       </button>

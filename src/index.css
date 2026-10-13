@@ -36,6 +36,25 @@
 
   /* Warning stays amber, kept close to existing so verdict semantics don't confuse users */
   --color-warn-500: #D9A441;
+
+  /* Surface compatibility palette */
+  --color-surface-950: #0B0D0F;
+  --color-surface-900: #14171A;
+  --color-surface-800: #1E2226;
+  --color-surface-700: #2A2F34;
+  --color-surface-600: #3D4349;
+  --color-surface-500: #5C6369;
+  --color-surface-400: #8A9096;
+  --color-surface-300: #B8BDC1;
+  --color-surface-200: #D8D6D0;
+  --color-surface-100: #E8E6E0;
+  --color-surface-50: #F5F3EE;
+
+  /* Accent mapping for legacy/PWA components */
+  --color-accent-400: #FF8F5E;
+  --color-accent-500: #FF6B35;
+  --color-accent-600: #E5502A;
+  --color-accent-700: #C93F1B;
 }
 
 @layer base {
@@ -93,13 +112,19 @@
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
 }
-.animate-fade-in-up {
-  animation: fade-in-up 0.35s ease-out both;
-}
 
-@media (prefers-reduced-motion: reduce) {
-  .redaction-bar, .animate-fade-in-up {
-    animation: none !important;
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.96);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.04);
+    opacity: 0.4;
+  }
+  100% {
+    transform: scale(0.96);
+    opacity: 0.8;
   }
 }
 
@@ -112,9 +137,15 @@
   }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .redaction-bar, .animate-fade-in-up, .animate-pulse-ring, .animate-shimmer {
+    animation: none !important;
+  }
+}
+
 @layer utilities {
   .animate-fade-in-up {
-    animation: fade-in-up 0.4s ease-out both;
+    animation: fade-in-up 0.35s ease-out both;
   }
 
   .animate-pulse-ring {

@@ -148,7 +148,7 @@ describe('getOutputFilename', () => {
   });
 
   it('throws on unsupported output MIME type to prevent corrupted file naming', () => {
-    expect(() => getOutputFilename('photo.jpg', 'image/tiff')).toThrow();
+    expect(() => getOutputFilename('photo.jpg', 'image/tiff')).toThrow(/Unsupported output format/);
   });
 });
 
@@ -184,5 +184,19 @@ describe('isHeic', () => {
   it('handles null or empty file safely', () => {
     expect(isHeic(null)).toBe(false);
     expect(isHeic({})).toBe(false);
+    expect(isHeic('')).toBe(false);
+  });
+
+  it('detects HEIC by filename string', () => {
+    expect(isHeic('photo.heic')).toBe(true);
+    expect(isHeic('PHOTO.HEIF')).toBe(true);
+    expect(isHeic('photo.jpg')).toBe(false);
+  });
+
+  it('detects HEIC by filename and MIME string', () => {
+    expect(isHeic('photo.jpg', 'image/heic')).toBe(true);
+    expect(isHeic('photo.jpg', 'image/heif')).toBe(true);
+    expect(isHeic('photo.jpg', 'image/jpeg')).toBe(false);
   });
 });
+

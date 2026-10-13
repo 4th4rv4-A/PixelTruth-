@@ -55,16 +55,23 @@ export function getOutputFilename(originalName, blobMimeType) {
 
 /**
  * Check if a file or object represents a HEIC/HEIF image.
- * @param {{ type?: string, name?: string }} file
+ * Supports both file objects ({ type, name }) and (filename, mime) string signatures.
+ * @param {File|{ type?: string, name?: string }|string} fileOrName
+ * @param {string} [mime]
  * @returns {boolean}
  */
-export function isHeic(file) {
-  if (!file) return false;
-  const type = (file.type || '').toLowerCase();
-  const name = (file.name || '').toLowerCase();
+export function isHeic(fileOrName, mime) {
+  if (!fileOrName) return false;
+  if (typeof fileOrName === 'string') {
+    const m = (mime || '').toLowerCase();
+    return /\.hei[cf]$/i.test(fileOrName) || m === 'image/heic' || m === 'image/heif';
+  }
+  const type = (fileOrName.type || mime || '').toLowerCase();
+  const name = (fileOrName.name || '').toLowerCase();
   return (
     type === 'image/heic' ||
     type === 'image/heif' ||
     /\.hei[cf]$/i.test(name)
   );
 }
+

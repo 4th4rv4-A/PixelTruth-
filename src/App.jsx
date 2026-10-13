@@ -10,12 +10,17 @@ import InstallPrompt from './components/InstallPrompt';
 import ErrorBoundary from './components/ErrorBoundary';
 import { createSafeThumbnail, MAX_FILES } from './utils/normalizeInput';
 import { readMetadata, getPrivacyLevel } from './utils/readMetadata';
-import { stripFull, stripSelective } from './utils/stripMetadata';
+import { cleanImageFile } from './utils/stripMetadata';
 import { downloadSingle } from './utils/zipDownload';
 import { getOutputFilename } from './utils/filenameUtils';
 import { readC2paManifest, flattenC2paRows } from './utils/c2paRows';
 
-let fileIdCounter = 0;
+function generateFileId() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return `clean-${crypto.randomUUID()}`;
+  }
+  return `clean-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
 
 export default function App() {
   // ─── File state ──────────────────────────────────────
@@ -75,7 +80,7 @@ export default function App() {
 
     const pendingItems = await Promise.all(
       filesToAccept.map(async (file) => ({
-        id: `clean-${++fileIdCounter}`,
+        id: generateFileId(),
         file,
         thumbnailUrl: await createSafeThumbnail(file),
         metadata: null,
@@ -102,8 +107,8 @@ export default function App() {
     // Auto-select first added file if none is selected
     setSelectedId((current) => current || allowedItems[0]?.id || null);
 
-    // Read metadata for each file
-    for (const item of allowedItems) {
+    // Read metadata for each file in parallel
+    allowedItems.forEach(async (item) => {
       const controller = new AbortController();
       abortControllersRef.current.set(item.id, controller);
 
@@ -148,7 +153,7 @@ export default function App() {
           );
         }
       }
-    }
+    });
   }, []);
 
   const handleCleanRemoveFile = useCallback((id) => {
@@ -217,14 +222,11 @@ export default function App() {
     abortControllersRef.current.set(fileId, controller);
 
     try {
-      let cleanedBlob;
-      const isJpeg = item.file.type === 'image/jpeg';
-
-      if (isJpeg && item.keepTags.length > 0) {
-        cleanedBlob = await stripSelective(item.file, item.keepTags, fullSanitize, null, controller.signal);
-      } else {
-        cleanedBlob = await stripFull(item.file, fullSanitize, null, controller.signal);
-      }
+      const cleanedBlob = await cleanImageFile(item.file, {
+        keepTags: item.keepTags,
+        fullSanitize,
+        signal: controller.signal,
+      });
 
       const outputName = getOutputFilename(item.file.name, cleanedBlob.type);
 
@@ -292,9 +294,10 @@ export default function App() {
             duration: 4000,
             style: {
               borderRadius: '12px',
-              background: 'var(--color-surface-800)',
+              background: 'var(--color-ink-900)',
               color: '#fff',
               fontSize: '14px',
+              border: '1px solid var(--color-ink-800)',
             },
           }}
         />
@@ -305,10 +308,10 @@ export default function App() {
 
         <main className="flex-1 max-w-4xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
           <div className="text-center space-y-2 mb-2">
-            <h2 className="text-2xl sm:text-3xl font-bold text-surface-900 dark:text-white">
+            <h2 className="text-2xl sm:text-3xl font-bold text-ink-900 dark:text-white">
               Clean your image metadata
             </h2>
-            <p className="text-surface-500 dark:text-surface-400 max-w-lg mx-auto">
+            <p className="text-ink-500 dark:text-ink-400 max-w-lg mx-auto">
               Remove GPS locations, device info, and other sensitive data from your photos.
               Everything happens in your browser — nothing is uploaded.
             </p>
@@ -351,7 +354,7 @@ export default function App() {
 
           {/* Footer */}
           <footer className="text-center pt-8 pb-4">
-            <p className="text-xs text-surface-400 dark:text-surface-600">
+            <p className="text-xs text-ink-400 dark:text-ink-600">
               PixelTruth v2.0.0 — Image Metadata Remover
             </p>
           </footer>

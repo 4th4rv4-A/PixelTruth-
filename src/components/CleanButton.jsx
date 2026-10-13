@@ -1,9 +1,9 @@
 import { useState, useRef } from 'react';
 import toast from 'react-hot-toast';
-import { stripFull, stripSelective } from '../utils/stripMetadata';
+import { cleanImageFile } from '../utils/stripMetadata';
 import { downloadAsZip } from '../utils/zipDownload';
 import { formatSize, formatSizeComparison } from '../utils/sizeUtils';
-import { getOutputFilename } from '../utils/filenameUtils';
+import { getOutputFilename, isHeic } from '../utils/filenameUtils';
 
 export default function CleanButton({
   files,
@@ -46,18 +46,14 @@ export default function CleanButton({
       setProgress({ current: i + 1, total: files.length, stage: 'PROCESSING' });
 
       try {
-        let cleanedBlob;
-        const isJpeg = item.file.type === 'image/jpeg';
-
-        const onProgress = (data) => {
-          setProgress({ current: i + 1, total: files.length, stage: data.stage });
-        };
-
-        if (isJpeg && item.keepTags.length > 0) {
-          cleanedBlob = await stripSelective(item.file, item.keepTags, fullSanitize, onProgress, controller.signal);
-        } else {
-          cleanedBlob = await stripFull(item.file, fullSanitize, onProgress, controller.signal);
-        }
+        const cleanedBlob = await cleanImageFile(item.file, {
+          keepTags: item.keepTags,
+          fullSanitize,
+          onProgress: (data) => {
+            setProgress({ current: i + 1, total: files.length, stage: data.stage });
+          },
+          signal: controller.signal,
+        });
 
         const outputName = getOutputFilename(item.file.name, cleanedBlob.type);
 
@@ -249,7 +245,7 @@ export default function CleanButton({
       )}
 
       {/* HEIC notice if HEIC files present */}
-      {!processing && files.some(f => f.file.type === 'image/heic' || f.file.type === 'image/heif' || f.file.name.toLowerCase().endsWith('.heic') || f.file.name.toLowerCase().endsWith('.heif')) && (
+      {!processing && files.some(f => isHeic(f.file)) && (
         <div className="p-3 bg-warn-900/20 border border-warn-500/30 rounded-lg text-xs text-warn-400 text-left">
           <strong className="block mb-0.5">HEIC Transcoding Notice:</strong>
           HEIC metadata removal converts images to clean JPEG in the browser. Output is visually lossless.
