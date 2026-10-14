@@ -1,7 +1,11 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
+import { usePwaInstall } from '../hooks/usePwaInstall';
+import { useI18n } from '../i18n/useI18n';
 
 export default function InstallPrompt() {
-  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const { canPromptDirectly, isInstalled, promptInstall } = usePwaInstall();
+  const { t } = useI18n();
+
   const [dismissed, setDismissed] = useState(() => {
     try {
       return localStorage.getItem('pixeltruth-install-dismissed') === 'true';
@@ -9,37 +13,6 @@ export default function InstallPrompt() {
       return false;
     }
   });
-  const [installed, setInstalled] = useState(false);
-
-  useEffect(() => {
-    const handler = (e) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-    };
-
-    const installedHandler = () => {
-      setInstalled(true);
-      setDeferredPrompt(null);
-    };
-
-    window.addEventListener('beforeinstallprompt', handler);
-    window.addEventListener('appinstalled', installedHandler);
-
-    return () => {
-      window.removeEventListener('beforeinstallprompt', handler);
-      window.removeEventListener('appinstalled', installedHandler);
-    };
-  }, []);
-
-  const handleInstall = useCallback(async () => {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === 'accepted') {
-      setInstalled(true);
-    }
-    setDeferredPrompt(null);
-  }, [deferredPrompt]);
 
   const handleDismiss = useCallback(() => {
     setDismissed(true);
@@ -50,8 +23,8 @@ export default function InstallPrompt() {
     }
   }, []);
 
-  // Don't show if: already installed, user dismissed, or no prompt available
-  if (installed || dismissed || !deferredPrompt) return null;
+  // Don't show floating card if: already installed, user dismissed, or no direct prompt available
+  if (isInstalled || dismissed || !canPromptDirectly) return null;
 
   return (
     <div className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-4 sm:w-96 z-50 animate-fade-in-up">
@@ -69,10 +42,10 @@ export default function InstallPrompt() {
           {/* Content */}
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-ink-900 dark:text-ink-100">
-              Install PixelTruth
+              {t('installTitle') || 'Install PixelTruth'}
             </p>
             <p className="text-xs text-ink-500 dark:text-ink-400 mt-0.5">
-              Add to your device for offline access
+              {t('installSubtitle') || 'Add to your device for offline access'}
             </p>
           </div>
 
@@ -91,10 +64,10 @@ export default function InstallPrompt() {
 
         {/* Install button */}
         <button
-          onClick={handleInstall}
+          onClick={promptInstall}
           className="mt-3 w-full py-2 px-4 rounded-md bg-safelight-500 hover:bg-safelight-400 text-ink-50 text-sm font-semibold shadow-sm transition-all duration-200 active:scale-[0.98] cursor-pointer"
         >
-          Install
+          {t('installApp') || 'Install'}
         </button>
       </div>
     </div>
