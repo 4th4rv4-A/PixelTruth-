@@ -9,7 +9,11 @@ export default defineConfig({
     react(),
     tailwindcss(),
     VitePWA({
-      registerType: 'prompt',
+      registerType: 'autoUpdate',
+      injectRegister: null,
+      devOptions: {
+        enabled: true,
+      },
       includeAssets: ['favicon.svg', 'icons.svg'],
       manifest: {
         name: 'PixelTruth — Image Metadata Remover',

@@ -1,0 +1,6 @@
+dist
+dev-dist
+node_modules
+test-results
+.temp-chrome-profile
+.temp-chrome-profile-user

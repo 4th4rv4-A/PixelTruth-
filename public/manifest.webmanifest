@@ -1,0 +1,30 @@
+{
+  "name": "PixelTruth — Image Metadata Remover",
+  "short_name": "PixelTruth",
+  "description": "Remove EXIF, GPS, and other metadata from your images entirely in your browser. Nothing is ever uploaded.",
+  "theme_color": "#0D9488",
+  "background_color": "#ffffff",
+  "display": "standalone",
+  "orientation": "any",
+  "start_url": "/",
+  "scope": "/",
+  "id": "/",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

@@ -53,4 +53,28 @@ test.describe('Universal PWA Install Feature', () => {
 
     expect(accessibilityScanResults.violations).toEqual([]);
   });
+
+  test('One-click native install triggers prompt directly without opening guidance modal', async ({ page }) => {
+    await page.evaluate(() => {
+      const fakeEvent = new Event('beforeinstallprompt');
+      fakeEvent.prompt = () => {
+        window.__fake_prompt_called = true;
+      };
+      fakeEvent.userChoice = Promise.resolve({ outcome: 'accepted' });
+      window.dispatchEvent(fakeEvent);
+    });
+
+    await page.locator('#install-app-button').click();
+
+    // Verify modal was NOT opened
+    const dialog = page.locator('[role="dialog"][aria-modal="true"]');
+    await expect(dialog).not.toBeVisible();
+
+    // Verify native prompt was called
+    const wasPromptCalled = await page.evaluate(() => window.__fake_prompt_called === true);
+    expect(wasPromptCalled).toBe(true);
+
+    // Verify UI transitioned to installed state
+    await expect(page.locator('text=App Installed')).toBeVisible();
+  });
 });

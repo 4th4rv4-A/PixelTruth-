@@ -22,6 +22,7 @@ export default function Header() {
   const {
     canPromptDirectly,
     isInstalled,
+    isPrompting,
     platform,
     isGuideOpen,
     closeGuide,
@@ -77,16 +78,28 @@ export default function Header() {
                 <button
                   id="install-app-button"
                   onClick={promptInstall}
-                  className="flex items-center gap-1.5 py-1.5 px-2.5 sm:px-3 rounded-lg border border-safelight-500/40 bg-safelight-500 hover:bg-safelight-400 text-white text-xs font-semibold shadow-sm transition-all duration-200 active:scale-95 cursor-pointer"
+                  disabled={isPrompting}
+                  className="flex items-center gap-1.5 py-1.5 px-2.5 sm:px-3 rounded-lg border border-safelight-500/40 bg-safelight-500 hover:bg-safelight-400 text-white text-xs font-semibold shadow-sm transition-all duration-200 active:scale-95 cursor-pointer disabled:opacity-80"
                   aria-label={t('installApp') || 'Install App'}
                 >
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                    <polyline points="7 10 12 15 17 10" />
-                    <line x1="12" y1="15" x2="12" y2="3" />
-                  </svg>
-                  <span className="hidden sm:inline">{t('installApp') || 'Install App'}</span>
-                  <span className="inline sm:hidden">Install</span>
+                  {isPrompting ? (
+                    <svg className="animate-spin w-3.5 h-3.5 text-white" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                  ) : (
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                      <polyline points="7 10 12 15 17 10" />
+                      <line x1="12" y1="15" x2="12" y2="3" />
+                    </svg>
+                  )}
+                  <span className="hidden sm:inline">
+                    {isPrompting ? 'Preparing...' : (t('installApp') || 'Install App')}
+                  </span>
+                  <span className="inline sm:hidden">
+                    {isPrompting ? '...' : 'Install'}
+                  </span>
                 </button>
               )}
 

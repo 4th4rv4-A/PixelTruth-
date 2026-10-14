@@ -5,7 +5,7 @@ export default function InstallModal({
   isOpen,
   onClose,
   platform = 'desktop',
-  canPromptDirectly = false,
+  _canPromptDirectly = false,
   onPromptInstall,
 }) {
   const { t } = useI18n();
@@ -165,98 +165,102 @@ export default function InstallModal({
           {/* Android Instructions */}
           {activeTab === 'android' && (
             <div className="space-y-3">
-              {canPromptDirectly && onPromptInstall ? (
-                <div className="p-4 bg-safelight-500/10 border border-safelight-500/30 rounded-xl space-y-3">
-                  <p className="text-xs text-ink-700 dark:text-ink-300 font-medium">
-                    Your browser supports 1-click installation!
-                  </p>
-                  <button
-                    onClick={() => {
-                      onClose();
-                      onPromptInstall();
-                    }}
-                    className="w-full py-2.5 px-4 rounded-xl bg-safelight-500 hover:bg-safelight-400 text-white text-sm font-semibold shadow-md transition-all active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2"
-                  >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                      <polyline points="7 10 12 15 17 10" />
-                      <line x1="12" y1="15" x2="12" y2="3" />
-                    </svg>
-                    Install App Now
-                  </button>
+              <div className="p-4 bg-ink-50 dark:bg-ink-800/50 border border-ink-200 dark:border-ink-700 rounded-xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-ink-900 dark:text-white font-bold flex items-center gap-1.5">
+                    <span className="inline-block w-2 h-2 rounded-full bg-develop-500 animate-pulse"></span>
+                    Instant 1-Click Install
+                  </span>
+                  <span className="text-[11px] text-ink-600 dark:text-ink-400 font-medium">Native Android App</span>
                 </div>
-              ) : (
-                <div className="space-y-2.5">
-                  <div className="flex items-start gap-3 p-3 rounded-xl bg-ink-50 dark:bg-ink-800/40 border border-ink-100 dark:border-ink-800">
-                    <div className="w-6 h-6 rounded-full bg-safelight-500 text-white text-xs font-bold flex items-center justify-center shrink-0">1</div>
-                    <div className="text-xs text-ink-700 dark:text-ink-300">
-                      <p className="font-semibold text-ink-900 dark:text-white">Open the Chrome menu</p>
-                      <p className="mt-0.5 text-ink-500 dark:text-ink-400">
-                        Tap the three dots (<strong>⋮</strong>) in the top-right corner.
-                      </p>
-                    </div>
-                  </div>
+                <button
+                  onClick={async () => {
+                    onClose();
+                    if (onPromptInstall) await onPromptInstall();
+                  }}
+                  className="w-full py-2.5 px-4 rounded-xl bg-ink-900 hover:bg-ink-800 text-white dark:bg-white dark:hover:bg-ink-100 dark:text-ink-950 text-sm font-bold shadow-md transition-all active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                  </svg>
+                  Install PixelTruth on Android
+                </button>
+              </div>
 
-                  <div className="flex items-start gap-3 p-3 rounded-xl bg-ink-50 dark:bg-ink-800/40 border border-ink-100 dark:border-ink-800">
-                    <div className="w-6 h-6 rounded-full bg-safelight-500 text-white text-xs font-bold flex items-center justify-center shrink-0">2</div>
-                    <div className="text-xs text-ink-700 dark:text-ink-300">
-                      <p className="font-semibold text-ink-900 dark:text-white">Tap "Install app" or "Add to Home screen"</p>
-                      <p className="mt-0.5 text-ink-500 dark:text-ink-400">
-                        Select the install option and follow the quick confirmation prompt.
-                      </p>
-                    </div>
+              <div className="space-y-2 pt-1">
+                <div className="flex items-start gap-3 p-3 rounded-xl bg-ink-50 dark:bg-ink-800/40 border border-ink-100 dark:border-ink-800">
+                  <div className="w-6 h-6 rounded-full bg-ink-900 text-white dark:bg-ink-100 dark:text-ink-900 text-xs font-bold flex items-center justify-center shrink-0">1</div>
+                  <div className="text-xs text-ink-700 dark:text-ink-300">
+                    <p className="font-semibold text-ink-900 dark:text-white">Open the Chrome menu</p>
+                    <p className="mt-0.5 text-ink-500 dark:text-ink-400">
+                      Tap the three dots (<strong>⋮</strong>) in the top-right corner.
+                    </p>
                   </div>
                 </div>
-              )}
+
+                <div className="flex items-start gap-3 p-3 rounded-xl bg-ink-50 dark:bg-ink-800/40 border border-ink-100 dark:border-ink-800">
+                  <div className="w-6 h-6 rounded-full bg-ink-900 text-white dark:bg-ink-100 dark:text-ink-900 text-xs font-bold flex items-center justify-center shrink-0">2</div>
+                  <div className="text-xs text-ink-700 dark:text-ink-300">
+                    <p className="font-semibold text-ink-900 dark:text-white">Tap "Install app" or "Add to Home screen"</p>
+                    <p className="mt-0.5 text-ink-500 dark:text-ink-400">
+                      Select the install option and follow the quick confirmation prompt.
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
           {/* Laptop & Desktop Instructions */}
           {activeTab === 'desktop' && (
             <div className="space-y-3">
-              {canPromptDirectly && onPromptInstall ? (
-                <div className="p-4 bg-safelight-500/10 border border-safelight-500/30 rounded-xl space-y-3">
-                  <p className="text-xs text-ink-700 dark:text-ink-300 font-medium">
-                    Direct installation is available for your browser.
-                  </p>
-                  <button
-                    onClick={() => {
-                      onClose();
-                      onPromptInstall();
-                    }}
-                    className="w-full py-2.5 px-4 rounded-xl bg-safelight-500 hover:bg-safelight-400 text-white text-sm font-semibold shadow-md transition-all active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2"
-                  >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                      <polyline points="7 10 12 15 17 10" />
-                      <line x1="12" y1="15" x2="12" y2="3" />
-                    </svg>
-                    Install App on Desktop
-                  </button>
+              <div className="p-4 bg-ink-50 dark:bg-ink-800/50 border border-ink-200 dark:border-ink-700 rounded-xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-ink-900 dark:text-white font-bold flex items-center gap-1.5">
+                    <span className="inline-block w-2 h-2 rounded-full bg-develop-500 animate-pulse"></span>
+                    Instant 1-Click Install
+                  </span>
+                  <span className="text-[11px] text-ink-600 dark:text-ink-400 font-medium">Standalone Desktop App</span>
                 </div>
-              ) : (
-                <div className="space-y-2.5">
-                  <div className="flex items-start gap-3 p-3 rounded-xl bg-ink-50 dark:bg-ink-800/40 border border-ink-100 dark:border-ink-800">
-                    <div className="w-6 h-6 rounded-full bg-safelight-500 text-white text-xs font-bold flex items-center justify-center shrink-0">1</div>
-                    <div className="text-xs text-ink-700 dark:text-ink-300">
-                      <p className="font-semibold text-ink-900 dark:text-white">Check your Browser Address Bar</p>
-                      <p className="mt-0.5 text-ink-500 dark:text-ink-400">
-                        In Chrome, Edge, or Brave, click the <strong>Install PixelTruth</strong> icon (computer with down arrow or <strong>⊕</strong>) on the right side of the address bar.
-                      </p>
-                    </div>
-                  </div>
+                <button
+                  onClick={async () => {
+                    onClose();
+                    if (onPromptInstall) await onPromptInstall();
+                  }}
+                  className="w-full py-2.5 px-4 rounded-xl bg-ink-900 hover:bg-ink-800 text-white dark:bg-white dark:hover:bg-ink-100 dark:text-ink-950 text-sm font-bold shadow-md transition-all active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                  </svg>
+                  Install PixelTruth App on Desktop
+                </button>
+              </div>
 
-                  <div className="flex items-start gap-3 p-3 rounded-xl bg-ink-50 dark:bg-ink-800/40 border border-ink-100 dark:border-ink-800">
-                    <div className="w-6 h-6 rounded-full bg-safelight-500 text-white text-xs font-bold flex items-center justify-center shrink-0">2</div>
-                    <div className="text-xs text-ink-700 dark:text-ink-300">
-                      <p className="font-semibold text-ink-900 dark:text-white">For macOS Safari (Sonoma+)</p>
-                      <p className="mt-0.5 text-ink-500 dark:text-ink-400">
-                        Click <strong>File</strong> in the top menu bar &gt; select <strong>Add to Dock...</strong>.
-                      </p>
-                    </div>
+              <div className="space-y-2 pt-1">
+                <div className="flex items-start gap-3 p-3 rounded-xl bg-ink-50 dark:bg-ink-800/40 border border-ink-100 dark:border-ink-800">
+                  <div className="w-6 h-6 rounded-full bg-ink-900 text-white dark:bg-ink-100 dark:text-ink-900 text-xs font-bold flex items-center justify-center shrink-0">1</div>
+                  <div className="text-xs text-ink-700 dark:text-ink-300">
+                    <p className="font-semibold text-ink-900 dark:text-white">Check your Browser Address Bar</p>
+                    <p className="mt-0.5 text-ink-500 dark:text-ink-400">
+                      In Chrome, Edge, or Brave, click the <strong>Install PixelTruth</strong> icon (computer with down arrow or <strong>⊕</strong>) on the right side of the address bar.
+                    </p>
                   </div>
                 </div>
-              )}
+
+                <div className="flex items-start gap-3 p-3 rounded-xl bg-ink-50 dark:bg-ink-800/40 border border-ink-100 dark:border-ink-800">
+                  <div className="w-6 h-6 rounded-full bg-ink-900 text-white dark:bg-ink-100 dark:text-ink-900 text-xs font-bold flex items-center justify-center shrink-0">2</div>
+                  <div className="text-xs text-ink-700 dark:text-ink-300">
+                    <p className="font-semibold text-ink-900 dark:text-white">For macOS Safari (Sonoma+)</p>
+                    <p className="mt-0.5 text-ink-500 dark:text-ink-400">
+                      Click <strong>File</strong> in the top menu bar &gt; select <strong>Add to Dock...</strong>.
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 

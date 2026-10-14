@@ -62,7 +62,6 @@ test.describe('Core Flows', () => {
     await expect(page.locator('text=/Only 20 more files can be added|Maximum 20 files allowed/')).toBeVisible();
     
     // Should only add 20 files to the queue
-    const count = await page.locator('[role="button"][aria-label^="Inspect metadata for"]').count();
-    expect(count).toBe(20);
+    await expect(page.locator('[role="button"][aria-label^="Inspect metadata for"]')).toHaveCount(20);
   });
 });
