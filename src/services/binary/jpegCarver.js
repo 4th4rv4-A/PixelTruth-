@@ -16,8 +16,10 @@ const MARKERS = {
 const textEncoder = new TextEncoder();
 const EXIF_SIG = textEncoder.encode("Exif\0\0");
 const XMP_SIG = textEncoder.encode("http://ns.adobe.com/xap/1.0/\0");
+const EXT_XMP_SIG = textEncoder.encode("http://ns.adobe.com/xmp/extension/\0");
 const ICC_SIG = textEncoder.encode("ICC_PROFILE\0");
 const JUMBF_SIG = textEncoder.encode("JUMBF");
+
 
 function bufferStartsWith(buffer, offset, signature) {
   if (offset + signature.length > buffer.length) return false;
@@ -316,9 +318,46 @@ export function sanitizeJpeg(inputBytes, policy = {}) {
 
     if (marker === MARKERS.SOS) {
       // SOS reached. Everything from here to EOI is image data.
-      outputChunks.push(inputBytes.subarray(offset, len));
-      result.preservedSegments.push({ type: 'SOS_AND_BITSTREAM', offset, size: len - offset });
+      // Scan entropy-coded scan data for the true EOI (0xFF 0xD9) marker to truncate any trailing payloads.
+      const sosSegLen = (inputBytes[offset + 2] << 8) | inputBytes[offset + 3];
+      const scanStart = offset + 2 + sosSegLen;
+      
+      let eoiOffset = -1;
+      let scanIdx = scanStart;
+      while (scanIdx < len - 1) {
+        if (inputBytes[scanIdx] === 0xFF) {
+          const next = inputBytes[scanIdx + 1];
+          if (next === MARKERS.EOI) {
+            eoiOffset = scanIdx;
+            break;
+          } else if (next === 0x00 || (next >= 0xD0 && next <= 0xD7)) {
+            // Byte-stuffed 0xFF 0x00 or restart marker (RST0-RST7)
+            scanIdx += 2;
+            continue;
+          } else if (next === 0xFF) {
+            // Consecutive fill bytes
+            scanIdx++;
+            continue;
+          } else {
+            // Other marker in multi-scan progressive JPEG
+            scanIdx += 2;
+            continue;
+          }
+        } else {
+          scanIdx++;
+        }
+      }
+
+      const bitstreamEnd = eoiOffset !== -1 ? eoiOffset + 2 : len;
+      outputChunks.push(inputBytes.subarray(offset, bitstreamEnd));
+      result.preservedSegments.push({ type: 'SOS_AND_BITSTREAM', offset, size: bitstreamEnd - offset });
       sosReached = true;
+
+      if (bitstreamEnd < len) {
+        const trailingSize = len - bitstreamEnd;
+        result.removedSegments.push({ type: 'TRAILING_PAYLOAD', offset: bitstreamEnd, size: trailingSize });
+        result.warnings.push(`Detected and removed ${trailingSize} bytes of trailing non-image data after EOI.`);
+      }
       break;
     } else if (marker === MARKERS.COM) {
       typeDesc = 'COM';
@@ -344,11 +383,16 @@ export function sanitizeJpeg(inputBytes, policy = {}) {
             }
           }
         }
-      } else if (bufferStartsWith(inputBytes, payloadOffset, XMP_SIG)) {
+      } else if (
+        bufferStartsWith(inputBytes, payloadOffset, XMP_SIG) ||
+        bufferStartsWith(inputBytes, payloadOffset, EXT_XMP_SIG)
+      ) {
         typeDesc = 'APP1_XMP';
         if (policy.removeXmp) keep = false;
       } else {
-        typeDesc = 'APP1_UNKNOWN';
+        typeDesc = 'APP1_METADATA';
+        // Under strict metadata removal, non-standard APP1 segments are metadata and stripped
+        if (policy.removeExif || policy.removeXmp) keep = false;
       }
     } else if (marker === MARKERS.APP2) {
       if (bufferStartsWith(inputBytes, payloadOffset, ICC_SIG)) {

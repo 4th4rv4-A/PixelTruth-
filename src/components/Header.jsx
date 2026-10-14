@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import LanguageSelector from './LanguageSelector';
 
 function getInitialTheme() {
   if (typeof window === 'undefined') return false;
@@ -46,24 +47,28 @@ export default function Header() {
             </h1>
           </div>
 
-          {/* Dark mode toggle */}
-          <button
-            id="theme-toggle"
-            onClick={() => setDark(!dark)}
-            className="w-10 h-10 flex items-center justify-end text-ink-400 hover:text-ink-300 transition-colors"
-            aria-label="Toggle dark mode"
-          >
-            {dark ? (
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="4" />
-                <path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
-              </svg>
-            ) : (
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
-              </svg>
-            )}
-          </button>
+          {/* Right controls: Language Selector + Dark Mode Toggle */}
+          <div className="flex items-center gap-3">
+            <LanguageSelector />
+
+            <button
+              id="theme-toggle"
+              onClick={() => setDark(!dark)}
+              className="w-9 h-9 flex items-center justify-center rounded-md border border-ink-800 text-ink-400 hover:text-ink-200 hover:bg-ink-900 transition-colors cursor-pointer"
+              aria-label="Toggle dark mode"
+            >
+              {dark ? (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="4" />
+                  <path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
+                </svg>
+              ) : (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
+                </svg>
+              )}
+            </button>
+          </div>
         </div>
       </div>
     </header>

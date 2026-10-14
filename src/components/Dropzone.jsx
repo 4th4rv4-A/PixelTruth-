@@ -191,7 +191,7 @@ export default function Dropzone({
           ref={inputRef}
           type="file"
           multiple
-          accept=".jpg,.jpeg,.png,.webp,.heic,.heif"
+          accept=".jpg,.jpeg,.png,.webp,.heic,.heif,.gif,.avif"
           className="hidden"
           onChange={(e) => {
             if (e.target.files?.length) processFiles(e.target.files);
@@ -217,7 +217,7 @@ export default function Dropzone({
               </span>
             </p>
             <p className="mt-1.5 text-sm text-ink-500 dark:text-ink-400">
-              JPEG, PNG, WebP, HEIC — up to 20 files, 50 MB each
+              JPEG, PNG, WebP, HEIC, GIF, AVIF — up to 20 files, 50 MB each
             </p>
             <p className="mt-1 text-xs text-ink-400 dark:text-ink-500">
               You can also paste images from your clipboard (Ctrl+V)

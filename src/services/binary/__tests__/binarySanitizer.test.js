@@ -444,4 +444,57 @@ describe('Binary Sanitizer Engine', () => {
       expect(result.preservedSegments.some((s) => s.type === 'APP11_C2PA')).toBe(true);
     });
   });
+
+  describe('Extended XMP & Trailing Payload Security', () => {
+    it('strips Extended XMP APP1 segments in JPEG', () => {
+      const extXmpSig = new TextEncoder().encode('http://ns.adobe.com/xmp/extension/\0');
+      const payload = new Uint8Array(2 + 2 + extXmpSig.length + 10);
+      payload[0] = 0xFF; payload[1] = 0xE1;
+      const segLen = 2 + extXmpSig.length + 10;
+      payload[2] = (segLen >> 8) & 0xFF;
+      payload[3] = segLen & 0xFF;
+      payload.set(extXmpSig, 4);
+
+      const sos = new Uint8Array([0xFF, 0xDA, 0x00, 0x04, 0x11, 0x22, 0xFF, 0xD9]);
+      const jpegWithExtXmp = new Uint8Array(2 + payload.length + sos.length);
+      jpegWithExtXmp[0] = 0xFF; jpegWithExtXmp[1] = 0xD8;
+      jpegWithExtXmp.set(payload, 2);
+      jpegWithExtXmp.set(sos, 2 + payload.length);
+
+      const result = sanitizeJpeg(jpegWithExtXmp, { removeXmp: true });
+      expect(result.status).toBe('success');
+      expect(result.removedSegments.some((s) => s.type === 'APP1_XMP')).toBe(true);
+      expect(result.preservedSegments.some((s) => s.type === 'APP1_XMP')).toBe(false);
+    });
+
+    it('detects and removes trailing non-image data after JPEG EOI', () => {
+      const baseJpeg = createMockJpeg(); // Ends with FF D9
+      const trailingData = new Uint8Array([0xDE, 0xAD, 0xBE, 0xEF, 0x01, 0x02, 0x03]);
+      const jpegWithTrailing = new Uint8Array(baseJpeg.length + trailingData.length);
+      jpegWithTrailing.set(baseJpeg, 0);
+      jpegWithTrailing.set(trailingData, baseJpeg.length);
+
+      const result = sanitizeJpeg(jpegWithTrailing, { removeExif: true });
+      expect(result.status).toBe('success');
+      expect(result.outputBytes[result.outputBytes.length - 2]).toBe(0xFF);
+      expect(result.outputBytes[result.outputBytes.length - 1]).toBe(0xD9);
+      expect(result.outputBytes.length).toBe(10); // baseJpeg minus APP1 (14 bytes)
+      expect(result.removedSegments.some((s) => s.type === 'TRAILING_PAYLOAD')).toBe(true);
+    });
+
+
+    it('detects and removes trailing non-image data after PNG IEND', () => {
+      const basePng = createMockPng();
+      const trailingData = new Uint8Array([0xCA, 0xFE, 0xBA, 0xBE]);
+      const pngWithTrailing = new Uint8Array(basePng.length + trailingData.length);
+      pngWithTrailing.set(basePng, 0);
+      pngWithTrailing.set(trailingData, basePng.length);
+
+      const result = sanitizePng(pngWithTrailing, { removeExif: true });
+      expect(result.status).toBe('success');
+      expect(result.removedSegments.some((s) => s.type === 'TRAILING_PAYLOAD')).toBe(true);
+      expect(result.outputBytes.length).toBeLessThan(pngWithTrailing.length);
+    });
+  });
 });
+

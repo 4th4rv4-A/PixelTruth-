@@ -58,5 +58,7 @@ export async function downloadAsZip(cleanedFiles) {
  * @param {Blob} blob
  */
 export function downloadSingle(name, blob) {
-  saveAs(blob, `cleaned-${name}`);
+  const safeName = (name && name.startsWith('cleaned-')) ? name : `cleaned-${name || 'image'}`;
+  saveAs(blob, safeName);
 }
+

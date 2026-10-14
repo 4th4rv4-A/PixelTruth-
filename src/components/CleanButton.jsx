@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
 import toast from 'react-hot-toast';
 import { cleanImageFile } from '../utils/stripMetadata';
-import { downloadAsZip } from '../utils/zipDownload';
+import { downloadAsZip, downloadSingle } from '../utils/zipDownload';
 import { formatSize, formatSizeComparison } from '../utils/sizeUtils';
 import { getOutputFilename, isHeic } from '../utils/filenameUtils';
 
@@ -82,7 +82,11 @@ export default function CleanButton({
       onFilesCleaned(cleanedResults);
 
       try {
-        await downloadAsZip(cleanedResults.map(r => ({ name: r.name, blob: r.blob })));
+        if (cleanedResults.length === 1) {
+          downloadSingle(cleanedResults[0].name, cleanedResults[0].blob);
+        } else {
+          await downloadAsZip(cleanedResults.map(r => ({ name: r.name, blob: r.blob })));
+        }
 
         // Calculate totals for size report
         const totalOriginal = sizeEntries.reduce((sum, e) => sum + e.originalSize, 0);
@@ -97,6 +101,7 @@ export default function CleanButton({
         console.error('Download failed:', err);
       }
     }
+
 
     if (controller.signal.aborted) {
       toast('Processing cancelled', { icon: '🛑' });

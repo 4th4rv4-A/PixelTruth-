@@ -62,6 +62,11 @@ export function createResult({
       if (format === 'jpeg') mimeType = 'image/jpeg';
       if (format === 'png') mimeType = 'image/png';
       if (format === 'webp') mimeType = 'image/webp';
+      if (format === 'gif') mimeType = 'image/gif';
+      if (format === 'avif') mimeType = 'image/avif';
+      if (format === 'mp4') mimeType = 'video/mp4';
+      if (format === 'mov') mimeType = 'video/quicktime';
+      if (format === 'pdf') mimeType = 'application/pdf';
       return new Blob([outputBytes], { type: mimeType });
     },
   };

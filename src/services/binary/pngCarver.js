@@ -89,12 +89,32 @@ export function sanitizePng(inputBytes, policy) {
 
     if (isCritical) {
       keep = true;
-      if (chunkType === 'IEND') iendReached = true;
+      if (chunkType === 'IEND') {
+        iendReached = true;
+        outputChunks.push(inputBytes.subarray(offset, nextOffset));
+        result.preservedSegments.push({ type: typeDesc, offset, size: nextOffset - offset });
+        if (nextOffset < len) {
+          const trailingSize = len - nextOffset;
+          result.removedSegments.push({ type: 'TRAILING_PAYLOAD', offset: nextOffset, size: trailingSize });
+          result.warnings.push(`Detected and removed ${trailingSize} bytes of trailing data after PNG IEND.`);
+        }
+        break;
+      }
     } else {
       // Ancillary chunk. We can remove it based on policy.
       
       // EXIF
       if (chunkType === 'eXIf' && policy.removeExif) {
+        keep = false;
+      }
+
+      // Modification timestamp (tIME)
+      if (chunkType === 'tIME' && (policy.removeComments || policy.removeExif || policy.fullSanitize)) {
+        keep = false;
+      }
+
+      // Digital signatures (dSIG)
+      if (chunkType === 'dSIG' && (policy.removeExif || policy.removeC2pa)) {
         keep = false;
       }
       
@@ -124,12 +144,7 @@ export function sanitizePng(inputBytes, policy) {
           keep = true;
           result.c2paPreserved = true;
         } else if (policy.removeExif) {
-          // Some software blindly removes all text chunks to be safe, but we only remove known metadata.
-          // In strict modes, we could remove everything, but here we just target common ones unless told otherwise.
-          // Let's remove all text chunks if we want to remove ALL comments and metadata, except if it's C2PA we want to preserve.
           if (policy.removeComments && policy.removeXmp) {
-              // We'll cautiously keep it unless it matches, or we can just nuke it.
-              // Let's be aggressive for privacy if removeComments is true.
               if (!(keyword === 'c2pa' && policy.preserveC2pa)) {
                  keep = false;
               }
@@ -150,9 +165,6 @@ export function sanitizePng(inputBytes, policy) {
       if (chunkType === 'iCCP' && policy.removeIcc) {
         keep = false;
       }
-      
-      // Physical pixel dimensions (pHYs), often kept, but sometimes considered metadata.
-      // We will keep it unless an extremely strict policy is applied.
     }
 
     if (keep) {

@@ -3,7 +3,12 @@ import { imagePool } from '../workers/instances';
 function getOutputMime(file) {
   if (file.type === 'image/png') return 'image/png';
   if (file.type === 'image/webp') return 'image/webp';
-  return 'image/jpeg';
+  if (file.type === 'image/gif') return 'image/gif';
+  if (file.type === 'image/avif') return 'image/avif';
+  if (file.type === 'video/mp4') return 'video/mp4';
+  if (file.type === 'video/quicktime') return 'video/quicktime';
+  if (file.type === 'application/pdf') return 'application/pdf';
+  return file.type || 'image/jpeg';
 }
 
 /**
