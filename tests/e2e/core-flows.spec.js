@@ -12,11 +12,11 @@ test.describe('Core Flows', () => {
     const fileChooser = await fileChooserPromise;
     
     // We would use our generated fixture here
-    await fileChooser.setFiles(path.join(process.cwd(), 'tests', 'fixtures', 'generated', 'valid.jpg'));
+    await fileChooser.setFiles(path.join(process.cwd(), 'tests', 'fixtures', 'realistic', 'canon_eos_portrait.jpg'));
 
     // Wait for it to appear in the queue
     await expect(page.locator('.frame').first()).toBeVisible();
-    await expect(page.locator('text=valid.jpg').first()).toBeVisible();
+    await expect(page.locator('text=canon_eos_portrait.jpg').first()).toBeVisible();
   });
 
   test('Batch Clean and Download ZIP', async ({ page }) => {
@@ -26,8 +26,8 @@ test.describe('Core Flows', () => {
     const fileChooser = await fileChooserPromise;
     
     await fileChooser.setFiles([
-      path.join(process.cwd(), 'tests', 'fixtures', 'generated', 'valid.jpg'),
-      path.join(process.cwd(), 'tests', 'fixtures', 'generated', 'valid.png')
+      path.join(process.cwd(), 'tests', 'fixtures', 'realistic', 'canon_eos_portrait.jpg'),
+      path.join(process.cwd(), 'tests', 'fixtures', 'realistic', 'clean_screenshot.png')
     ]);
 
     // Set up download promise before clicking Clean All

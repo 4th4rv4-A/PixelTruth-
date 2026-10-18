@@ -10,6 +10,7 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+dev-dist/
 *.local
 
 # Editor directories and files
@@ -28,7 +29,6 @@ dist-ssr
 coverage/
 .env*
 
-# Generated test fixtures
-tests/fixtures/generated/
+# Test Reports and Output
 playwright-report/
 test-results/

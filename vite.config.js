@@ -14,7 +14,7 @@ export default defineConfig({
       devOptions: {
         enabled: true,
       },
-      includeAssets: ['favicon.svg', 'icons.svg'],
+      includeAssets: ['favicon.svg'],
       manifest: {
         name: 'PixelTruth — Image Metadata Remover',
         short_name: 'PixelTruth',
