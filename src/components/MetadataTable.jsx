@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import toast from 'react-hot-toast';
+import GpsPrivacyRadar from './GpsPrivacyRadar';
 import { isTagAlwaysKept, getDetailedPrivacyReport } from '../utils/readMetadata';
 import {
   formatTagValue,
@@ -33,6 +34,7 @@ export default function MetadataTable({
   isJpeg,
   mimeType,
   fileName = 'image',
+  isCleaned = false,
 }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [copiedKey, setCopiedKey] = useState(null);
@@ -112,47 +114,14 @@ export default function MetadataTable({
         </div>
       )}
 
-      {/* GPS Location Alert & Map Card */}
+      {/* Interactive GPS Privacy Radar */}
       {gpsInfo.hasGps && (
-        <div className="p-3.5 rounded-md bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-fade-in-up">
-          <div className="flex items-start gap-2.5">
-            <div className="w-7 h-7 rounded-full bg-rose-100 dark:bg-rose-900/50 flex items-center justify-center text-rose-600 dark:text-rose-400 shrink-0 mt-0.5">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-                <circle cx="12" cy="10" r="3" />
-              </svg>
-            </div>
-            <div className="space-y-0.5">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-rose-800 dark:text-rose-300">
-                  Exact Physical Location Exposed
-                </span>
-                <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-rose-200 dark:bg-rose-900 text-rose-800 dark:text-rose-200">
-                  CRITICAL PRIVACY RISK
-                </span>
-              </div>
-              <p className="text-xs font-mono text-rose-900 dark:text-rose-200 font-medium">
-                {gpsInfo.formattedCoords}
-                {gpsInfo.altitude && ` • ${gpsInfo.altitude}`}
-              </p>
-            </div>
-          </div>
-
-          <a
-            href={gpsInfo.mapUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="px-3 py-1.5 rounded-md bg-white dark:bg-ink-800 border border-rose-300 dark:border-rose-800 text-rose-700 dark:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-900/40 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors shadow-xs shrink-0"
-            title="Open coordinates in OpenStreetMap in a new tab"
-          >
-            <span>View on Map</span>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-              <polyline points="15 3 21 3 21 9" />
-              <line x1="10" y1="14" x2="21" y2="3" />
-            </svg>
-          </a>
-        </div>
+        <GpsPrivacyRadar
+          gpsInfo={gpsInfo}
+          metadata={metadata}
+          isCleaned={isCleaned}
+          fileName={fileName}
+        />
       )}
 
       {/* Privacy Risk Breakdown Diagnostic */}

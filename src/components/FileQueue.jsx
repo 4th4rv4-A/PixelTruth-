@@ -236,6 +236,7 @@ export default function FileQueue({
               isJpeg={isJpeg}
               mimeType={selectedItem.file.type}
               fileName={selectedItem.file.name}
+              isCleaned={selectedItem.status === 'CLEANED'}
             />
           )}
         </div>

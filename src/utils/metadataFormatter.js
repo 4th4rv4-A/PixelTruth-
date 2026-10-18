@@ -216,6 +216,14 @@ export function extractGpsInfo(metadata) {
     formattedCoords,
     altitude,
     mapUrl,
+    decimalCoords: `${rawLat.toFixed(6)}, ${rawLon.toFixed(6)}`,
+    dmsLat: formatDms(rawLat, true),
+    dmsLon: formatDms(rawLon, false),
+    googleMapsUrl: `https://www.google.com/maps?q=${rawLat.toFixed(6)},${rawLon.toFixed(6)}`,
+    appleMapsUrl: `https://maps.apple.com/?q=${rawLat.toFixed(6)},${rawLon.toFixed(6)}`,
+    osmUrl: mapUrl,
+    dateStamp: metadata.GPSDateStamp || null,
+    direction: typeof metadata.GPSImgDirection === 'number' ? `${metadata.GPSImgDirection.toFixed(1)}°` : null,
   };
 }
 

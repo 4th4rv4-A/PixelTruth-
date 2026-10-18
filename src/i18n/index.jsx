@@ -35,3 +35,4 @@ export function I18nProvider({ children }) {
     </I18nContext.Provider>
   );
 }
+
