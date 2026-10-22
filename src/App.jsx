@@ -304,18 +304,20 @@ export default function App() {
 
         <InstallPrompt />
 
-        <Header />
+        <Header files={cleanFiles} />
 
-        <main className="flex-1 max-w-4xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-          <div className="text-center space-y-2 mb-2">
-            <h2 className="text-2xl sm:text-3xl font-bold text-ink-900 dark:text-white">
-              Clean your image metadata
-            </h2>
-            <p className="text-ink-500 dark:text-ink-400 max-w-lg mx-auto">
-              Remove GPS locations, device info, and other sensitive data from your photos.
-              Everything happens in your browser — nothing is uploaded.
-            </p>
-          </div>
+        <main className={`flex-1 w-full mx-auto px-3 sm:px-6 lg:px-8 py-6 space-y-6 transition-all duration-300 ${cleanFiles.length > 0 ? 'max-w-[1720px]' : 'max-w-4xl'}`}>
+          {cleanFiles.length === 0 && (
+            <div className="text-center space-y-2 mb-2 animate-fade-in-up">
+              <h2 className="text-2xl sm:text-3xl font-bold text-ink-900 dark:text-white">
+                Clean your image metadata
+              </h2>
+              <p className="text-ink-500 dark:text-ink-400 max-w-lg mx-auto">
+                Remove GPS locations, device info, and other sensitive data from your photos.
+                Everything happens in your browser — nothing is uploaded.
+              </p>
+            </div>
+          )}
 
           <ErrorBoundary onReset={handleClearAll}>
             {/* Dropzone with SELECT FILES and CLEAR buttons */}

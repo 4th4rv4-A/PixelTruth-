@@ -61,8 +61,8 @@ test.describe('Real-World User Flows', () => {
     await expect(page.locator('tr', { hasText: 'Orientation' }).getByText('Always kept')).toBeVisible();
 
     // 4. Verify device info
-    await expect(page.locator('text=Canon EOS R6 Mark II')).toBeVisible();
-    await expect(page.locator('text=RF85mm F1.2 L USM')).toBeVisible();
+    await expect(page.locator('text=Canon EOS R6 Mark II').first()).toBeVisible();
+    await expect(page.locator('text=RF85mm F1.2 L USM').first()).toBeVisible();
 
     // 5. Remove file from queue using card X button
     await page.locator('button[aria-label="Remove canon_eos_portrait.jpg"]').click();

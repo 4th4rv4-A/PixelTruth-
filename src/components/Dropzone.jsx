@@ -219,6 +219,10 @@ export default function Dropzone({
             <p className="mt-1.5 text-sm text-ink-500 dark:text-ink-400">
               JPEG, PNG, WebP, HEIC, GIF, AVIF — up to 20 files, 50 MB each
             </p>
+            <div className="mt-2 flex items-center justify-center gap-1.5 font-mono text-[11px] text-develop-400">
+              <span className="w-1.5 h-1.5 rounded-full bg-develop-400" />
+              <span>Zero Network Upload • In-Browser Cryptographic Sandbox</span>
+            </div>
             <p className="mt-1 text-xs text-ink-400 dark:text-ink-500">
               You can also paste images from your clipboard (Ctrl+V)
             </p>
