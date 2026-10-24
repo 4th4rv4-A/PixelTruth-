@@ -294,4 +294,94 @@ describe('File Intake Security Pipeline', () => {
       expect(result.height).toBe(600);
     });
   });
+
+  describe('WebP Validation & Bounds Checking', () => {
+    it('parses valid WebP VP8X chunk for canvas dimensions', async () => {
+      const bytes = new Uint8Array(32);
+      let i = 0;
+      // 'RIFF' + len + 'WEBP'
+      bytes[i++] = 0x52; bytes[i++] = 0x49; bytes[i++] = 0x46; bytes[i++] = 0x46;
+      bytes[i++] = 24; bytes[i++] = 0; bytes[i++] = 0; bytes[i++] = 0;
+      bytes[i++] = 0x57; bytes[i++] = 0x45; bytes[i++] = 0x42; bytes[i++] = 0x50;
+
+      // 'VP8X' + len 10
+      bytes[i++] = 0x56; bytes[i++] = 0x50; bytes[i++] = 0x38; bytes[i++] = 0x58;
+      bytes[i++] = 10; bytes[i++] = 0; bytes[i++] = 0; bytes[i++] = 0;
+      // Flags (4 bytes)
+      i += 4;
+      // Width - 1 = 799 (0x031F -> 0x1F, 0x03, 0x00)
+      bytes[i++] = 0x1F; bytes[i++] = 0x03; bytes[i++] = 0x00;
+      // Height - 1 = 599 (0x0257 -> 0x57, 0x02, 0x00)
+      bytes[i++] = 0x57; bytes[i++] = 0x02; bytes[i++] = 0x00;
+
+      const file = createFakeFile('test.webp', bytes.length, bytes);
+      const result = await validateHeaderSafety(file);
+
+      expect(result.valid).toBe(true);
+      expect(result.format).toBe('webp');
+      expect(result.width).toBe(800);
+      expect(result.height).toBe(600);
+    });
+
+    it('rejects truncated VP8X chunk where canvas dimensions cannot be fully read', async () => {
+      // Array truncated before height bytes are present (length 26)
+      const bytes = new Uint8Array(26);
+      let i = 0;
+      bytes[i++] = 0x52; bytes[i++] = 0x49; bytes[i++] = 0x46; bytes[i++] = 0x46;
+      bytes[i++] = 18; bytes[i++] = 0; bytes[i++] = 0; bytes[i++] = 0;
+      bytes[i++] = 0x57; bytes[i++] = 0x45; bytes[i++] = 0x42; bytes[i++] = 0x50;
+
+      bytes[i++] = 0x56; bytes[i++] = 0x50; bytes[i++] = 0x38; bytes[i++] = 0x58;
+      bytes[i++] = 10; bytes[i++] = 0; bytes[i++] = 0; bytes[i++] = 0;
+      // Flags (4 bytes)
+      i += 4;
+      // Truncated here: only width bytes present, height missing
+      bytes[i++] = 0x1F; bytes[i++] = 0x03;
+
+      const file = createFakeFile('truncated_vp8x.webp', bytes.length, bytes);
+      const result = await validateHeaderSafety(file);
+
+      expect(result.valid).toBe(false);
+      expect(result.reasons).toContain('MALFORMED_CONTAINER');
+    });
+  });
+
+  describe('BMFF 64-bit Box Length Handling', () => {
+    it('correctly handles 64-bit extended box size in BMFF container', async () => {
+      const bytes = new Uint8Array(80);
+      let i = 0;
+
+      // ftyp box with 64-bit length (size field = 1, followed by 8-byte length = 24)
+      bytes[i++] = 0; bytes[i++] = 0; bytes[i++] = 0; bytes[i++] = 1; // 64-bit indicator
+      bytes[i++] = 0x66; bytes[i++] = 0x74; bytes[i++] = 0x79; bytes[i++] = 0x70; // 'ftyp'
+      // 8 bytes extended size (high 32 bits = 0, low 32 bits = 24)
+      bytes[i++] = 0; bytes[i++] = 0; bytes[i++] = 0; bytes[i++] = 0;
+      bytes[i++] = 0; bytes[i++] = 0; bytes[i++] = 0; bytes[i++] = 24;
+      // ftyp payload (8 bytes: major brand 'avif', minor 0)
+      bytes[i++] = 0x61; bytes[i++] = 0x76; bytes[i++] = 0x69; bytes[i++] = 0x66;
+      bytes[i++] = 0; bytes[i++] = 0; bytes[i++] = 0; bytes[i++] = 0;
+
+      // meta box (len 28)
+      bytes[i++] = 0; bytes[i++] = 0; bytes[i++] = 0; bytes[i++] = 28;
+      bytes[i++] = 0x6D; bytes[i++] = 0x65; bytes[i++] = 0x74; bytes[i++] = 0x61;
+      i += 4; // version/flags
+
+      // ispe box inside meta (len 16)
+      bytes[i++] = 0; bytes[i++] = 0; bytes[i++] = 0; bytes[i++] = 16;
+      bytes[i++] = 0x69; bytes[i++] = 0x73; bytes[i++] = 0x70; bytes[i++] = 0x65;
+      i += 4; // version/flags
+      // width = 1024 (0x00000400)
+      bytes[i++] = 0; bytes[i++] = 0; bytes[i++] = 0x04; bytes[i++] = 0x00;
+      // height = 768 (0x00000300)
+      bytes[i++] = 0; bytes[i++] = 0; bytes[i++] = 0x03; bytes[i++] = 0x00;
+
+      const file = createFakeFile('test_64bit.avif', bytes.length, bytes);
+      const result = await validateHeaderSafety(file);
+
+      expect(result.valid).toBe(true);
+      expect(result.format).toBe('avif');
+      expect(result.width).toBe(1024);
+      expect(result.height).toBe(768);
+    });
+  });
 });

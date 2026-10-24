@@ -34,8 +34,13 @@ export async function stripFull(file, fullSanitize = false, onProgress, signal) 
     signal
   });
 
-  const mimeType = getOutputMime(file);
-  return new Blob([result.buffer], { type: mimeType });
+  const mimeType = result.mimeType || getOutputMime(file);
+  const blob = new Blob([result.buffer], { type: mimeType });
+  blob.inputFormat = result.inputFormat;
+  blob.outputFormat = result.outputFormat;
+  blob.isLossless = result.isLossless ?? true;
+  blob.warnings = result.warnings || [];
+  return blob;
 }
 
 /**
@@ -62,8 +67,13 @@ export async function stripSelective(file, keepTags = [], fullSanitize = false, 
     signal
   });
 
-  const mimeType = getOutputMime(file);
-  return new Blob([result.buffer], { type: mimeType });
+  const mimeType = result.mimeType || getOutputMime(file);
+  const blob = new Blob([result.buffer], { type: mimeType });
+  blob.inputFormat = result.inputFormat;
+  blob.outputFormat = result.outputFormat;
+  blob.isLossless = result.isLossless ?? true;
+  blob.warnings = result.warnings || [];
+  return blob;
 }
 
 /**

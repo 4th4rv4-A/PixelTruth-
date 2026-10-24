@@ -36,20 +36,30 @@ export default function App() {
     cleanFilesRef.current = cleanFiles;
   }, [cleanFiles]);
 
-  // Controllers for background tasks
-  const abortControllersRef = useRef(new Map());
+  // Controllers for background tasks separated by task type
+  const generationRef = useRef(0);
+  const metadataControllersRef = useRef(new Map());
+  const c2paControllersRef = useRef(new Map());
+  const singleCleanControllersRef = useRef(new Map());
+  const batchCleanControllerRef = useRef(null);
 
   // Cleanup object URLs and pending tasks on unmount
   useEffect(() => {
-    const controllers = abortControllersRef.current;
+    const metaControllers = metadataControllersRef.current;
+    const c2paControllers = c2paControllersRef.current;
+    const singleControllers = singleCleanControllersRef.current;
     return () => {
       cleanFilesRef.current.forEach((item) => {
         if (item.thumbnailUrl) URL.revokeObjectURL(item.thumbnailUrl);
       });
-      for (const controller of controllers.values()) {
-        controller.abort();
-      }
-      controllers.clear();
+      for (const ctrl of metaControllers.values()) ctrl.abort();
+      for (const ctrl of c2paControllers.values()) ctrl.abort();
+      for (const ctrl of singleControllers.values()) ctrl.abort();
+      if (batchCleanControllerRef.current) batchCleanControllerRef.current.abort();
+      metaControllers.clear();
+      c2paControllers.clear();
+      singleControllers.clear();
+      batchCleanControllerRef.current = null;
     };
   }, []);
 
@@ -70,6 +80,7 @@ export default function App() {
   }, []);
 
   const handleCleanFilesAdded = useCallback(async (newFiles) => {
+    const currentGen = generationRef.current;
     const availableSlots = Math.max(0, MAX_FILES - cleanFilesRef.current.length);
     const filesToAccept = newFiles.slice(0, availableSlots);
 
@@ -92,6 +103,13 @@ export default function App() {
       }))
     );
 
+    if (currentGen !== generationRef.current) {
+      pendingItems.forEach((item) => {
+        if (item.thumbnailUrl) URL.revokeObjectURL(item.thumbnailUrl);
+      });
+      return;
+    }
+
     const allowedItems = pendingItems;
     setCleanFiles((prev) => {
       const remaining = Math.max(0, MAX_FILES - prev.length);
@@ -108,59 +126,77 @@ export default function App() {
     setSelectedId((current) => current || allowedItems[0]?.id || null);
 
     // Read metadata for each file in parallel
-    allowedItems.forEach(async (item) => {
-      const controller = new AbortController();
-      abortControllersRef.current.set(item.id, controller);
+    allowedItems.forEach((item) => {
+      const metaController = new AbortController();
+      metadataControllersRef.current.set(item.id, metaController);
 
-      try {
-        const metadata = await readMetadata(item.file, controller.signal);
-        const privacyLevel = getPrivacyLevel(metadata);
+      readMetadata(item.file, metaController.signal)
+        .then((metadata) => {
+          if (currentGen !== generationRef.current || metaController.signal.aborted) return;
+          const privacyLevel = getPrivacyLevel(metadata);
 
-        // Render EXIF/JFIF rows immediately. Content Credentials (C2PA) hydrate
-        // separately below so the heavy WASM read never blocks the metadata table.
-        setCleanFiles((prev) =>
-          prev.map((f) =>
-            f.id === item.id
-              ? { ...f, metadata: { ...metadata, __c2pa: [] }, privacyLevel, status: 'IDLE' }
-              : f
-          )
-        );
-
-        // Content Credentials (C2PA) — lazy and non-blocking, mirroring exifremover.com.
-        readC2paManifest(item.file, controller.signal)
-          .then((manifest) => {
-            const rows = flattenC2paRows(manifest);
-            if (!rows.length) return;
-            setCleanFiles((prev) =>
-              prev.map((f) =>
-                f.id === item.id ? { ...f, metadata: { ...f.metadata, __c2pa: rows } } : f
-              )
-            );
-          })
-          .catch(() => {
-            /* no credentials, decode error, or cancelled — rows stay empty */
-          })
-          .finally(() => {
-            abortControllersRef.current.delete(item.id);
-          });
-      } catch (err) {
-        abortControllersRef.current.delete(item.id);
-        if (err.message !== 'CANCELLED') {
+          // Render EXIF/JFIF rows immediately
           setCleanFiles((prev) =>
             prev.map((f) =>
-              f.id === item.id ? { ...f, metadata: { __c2pa: [] }, privacyLevel: 'low', status: 'IDLE' } : f
+              f.id === item.id
+                ? { ...f, metadata: { ...metadata, __c2pa: [] }, privacyLevel, status: 'IDLE' }
+                : f
             )
           );
-        }
-      }
+
+          // Content Credentials (C2PA) with dedicated controller
+          const c2paController = new AbortController();
+          c2paControllersRef.current.set(item.id, c2paController);
+
+          readC2paManifest(item.file, c2paController.signal)
+            .then((manifest) => {
+              if (currentGen !== generationRef.current || c2paController.signal.aborted) return;
+              const rows = flattenC2paRows(manifest);
+              if (!rows.length) return;
+              setCleanFiles((prev) =>
+                prev.map((f) =>
+                  f.id === item.id ? { ...f, metadata: { ...f.metadata, __c2pa: rows } } : f
+                )
+              );
+            })
+            .catch(() => {
+              /* no credentials, decode error, or cancelled */
+            })
+            .finally(() => {
+              c2paControllersRef.current.delete(item.id);
+            });
+        })
+        .catch((err) => {
+          if (currentGen !== generationRef.current || metaController.signal.aborted) return;
+          if (err.message !== 'CANCELLED') {
+            setCleanFiles((prev) =>
+              prev.map((f) =>
+                f.id === item.id ? { ...f, metadata: { __c2pa: [] }, privacyLevel: 'low', status: 'IDLE' } : f
+              )
+            );
+          }
+        })
+        .finally(() => {
+          metadataControllersRef.current.delete(item.id);
+        });
     });
   }, []);
 
   const handleCleanRemoveFile = useCallback((id) => {
-    const controller = abortControllersRef.current.get(id);
-    if (controller) {
-      controller.abort();
-      abortControllersRef.current.delete(id);
+    const metaCtrl = metadataControllersRef.current.get(id);
+    if (metaCtrl) {
+      metaCtrl.abort();
+      metadataControllersRef.current.delete(id);
+    }
+    const c2paCtrl = c2paControllersRef.current.get(id);
+    if (c2paCtrl) {
+      c2paCtrl.abort();
+      c2paControllersRef.current.delete(id);
+    }
+    const cleanCtrl = singleCleanControllersRef.current.get(id);
+    if (cleanCtrl) {
+      cleanCtrl.abort();
+      singleCleanControllersRef.current.delete(id);
     }
 
     setCleanFiles((prev) => {
@@ -181,11 +217,20 @@ export default function App() {
   }, []);
 
   const handleClearAll = useCallback(() => {
-    // Abort all in flight
-    for (const controller of abortControllersRef.current.values()) {
-      controller.abort();
+    generationRef.current++;
+
+    // Abort all in-flight tasks across all task types
+    for (const ctrl of metadataControllersRef.current.values()) ctrl.abort();
+    for (const ctrl of c2paControllersRef.current.values()) ctrl.abort();
+    for (const ctrl of singleCleanControllersRef.current.values()) ctrl.abort();
+    if (batchCleanControllerRef.current) {
+      batchCleanControllerRef.current.abort();
+      batchCleanControllerRef.current = null;
     }
-    abortControllersRef.current.clear();
+
+    metadataControllersRef.current.clear();
+    c2paControllersRef.current.clear();
+    singleCleanControllersRef.current.clear();
 
     // Revoke thumbnails
     cleanFilesRef.current.forEach((item) => {
@@ -214,12 +259,13 @@ export default function App() {
     const item = cleanFilesRef.current.find((f) => f.id === fileId);
     if (!item) return;
 
+    const currentGen = generationRef.current;
     setCleanFiles((prev) =>
       prev.map((f) => (f.id === fileId ? { ...f, status: 'PROCESSING' } : f))
     );
 
     const controller = new AbortController();
-    abortControllersRef.current.set(fileId, controller);
+    singleCleanControllersRef.current.set(fileId, controller);
 
     try {
       const cleanedBlob = await cleanImageFile(item.file, {
@@ -227,6 +273,8 @@ export default function App() {
         fullSanitize,
         signal: controller.signal,
       });
+
+      if (currentGen !== generationRef.current || controller.signal.aborted) return;
 
       const outputName = getOutputFilename(item.file.name, cleanedBlob.type);
 
@@ -246,6 +294,7 @@ export default function App() {
 
       toast.success(`"${item.file.name}" cleaned! Click SAVE to download.`);
     } catch (err) {
+      if (currentGen !== generationRef.current || controller.signal.aborted) return;
       if (err.message !== 'CANCELLED') {
         toast.error(`Failed to clean "${item.file.name}": ${err.message || 'Error'}`);
         setCleanFiles((prev) =>
@@ -253,7 +302,7 @@ export default function App() {
         );
       }
     } finally {
-      abortControllersRef.current.delete(fileId);
+      singleCleanControllersRef.current.delete(fileId);
     }
   }, [fullSanitize]);
 
@@ -348,6 +397,7 @@ export default function App() {
               onFilesCleaned={handleFilesCleaned}
               sizeReport={sizeReport}
               setSizeReport={setSizeReport}
+              batchCleanControllerRef={batchCleanControllerRef}
             />
           </ErrorBoundary>
 

@@ -47,4 +47,27 @@ describe('Worker Payload Contract', () => {
       dispatchSpy.mockRestore();
     }
   });
+
+  it('guarantees single-settle and detaches abort listeners on cancellation', async () => {
+    const { WorkerPool } = await import('../../src/workers/pool.js');
+    const mockWorker = {
+      postMessage: vi.fn(),
+      terminate: vi.fn(),
+    };
+    const pool = new WorkerPool(() => mockWorker, 1, 5000);
+
+    const controller = new AbortController();
+    const dispatchPromise = pool.dispatch('DUMMY_ACTION', {}, { signal: controller.signal });
+
+    // Cancel while queued or running
+    controller.abort();
+
+    await expect(dispatchPromise).rejects.toThrow('CANCELLED');
+
+    // Settle again should be a no-op (no double settle)
+    expect(() => {
+      // Simulate another worker response after already aborted
+      pool.handleMessage({ worker: mockWorker, activeJobId: 'job_1' }, { id: 'job_1', type: 'COMPLETE', result: {} });
+    }).not.toThrow();
+  });
 });

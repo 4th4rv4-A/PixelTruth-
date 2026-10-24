@@ -7,9 +7,13 @@ if (!fs.existsSync(outDir)) {
   fs.mkdirSync(outDir, { recursive: true });
 }
 
-// Minimal valid standard JPEG
-const b64 = '/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=';
-const baseJpegDataUrl = 'data:image/jpeg;base64,' + b64;
+// Minimal valid standard JPEG with scan byte and true EOI marker (0xFF, 0xD9)
+const rawBaseJpeg = Buffer.from(
+  '/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=',
+  'base64'
+);
+const baseJpegBuffer = Buffer.concat([rawBaseJpeg, Buffer.from([0x00, 0xFF, 0xD9])]);
+const baseJpegDataUrl = 'data:image/jpeg;base64,' + baseJpegBuffer.toString('base64');
 
 // Case 1: iPhone 15 Pro with GPS Location and Personal / Camera info
 const iphoneExifObj = {

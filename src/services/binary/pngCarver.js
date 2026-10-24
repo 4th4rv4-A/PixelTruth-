@@ -1,4 +1,4 @@
-import { createResult } from './policy.js';
+import { createResult, validatePolicy } from './policy.js';
 
 const PNG_SIGNATURE = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
 
@@ -15,7 +15,8 @@ const textDecoder = new TextDecoder('ascii');
 /**
  * Parses and selectively copies PNG chunks.
  */
-export function sanitizePng(inputBytes, policy) {
+export function sanitizePng(inputBytes, rawPolicy = {}) {
+  const policy = validatePolicy(rawPolicy);
   const result = {
     format: 'png',
     inputBytes,
@@ -40,6 +41,8 @@ export function sanitizePng(inputBytes, policy) {
 
   let offset = 8;
   let iendReached = false;
+  let hasIhdr = false;
+  let hasIdat = false;
   let segmentCount = 0;
   const MAX_SEGMENTS = 5000;
 
@@ -56,19 +59,16 @@ export function sanitizePng(inputBytes, policy) {
       return createResult(result);
     }
 
-    const chunkLen = (inputBytes[offset] << 24) |
-                     (inputBytes[offset + 1] << 16) |
-                     (inputBytes[offset + 2] << 8) |
-                     (inputBytes[offset + 3]);
-                     
-    if (chunkLen < 0) {
-      result.status = 'malformed';
-      result.error = 'Invalid chunk length (too large).';
-      return createResult(result);
-    }
+    const chunkLen = ((inputBytes[offset] << 24) |
+                      (inputBytes[offset + 1] << 16) |
+                      (inputBytes[offset + 2] << 8) |
+                      (inputBytes[offset + 3])) >>> 0;
 
     const chunkTypeBytes = inputBytes.subarray(offset + 4, offset + 8);
     const chunkType = textDecoder.decode(chunkTypeBytes);
+
+    if (chunkType === 'IHDR') hasIhdr = true;
+    if (chunkType === 'IDAT') hasIdat = true;
 
     const nextOffset = offset + 8 + chunkLen + 4; // length + type + data + crc
 
@@ -109,7 +109,7 @@ export function sanitizePng(inputBytes, policy) {
       }
 
       // Modification timestamp (tIME)
-      if (chunkType === 'tIME' && (policy.removeComments || policy.removeExif || policy.fullSanitize)) {
+      if (chunkType === 'tIME' && (policy.removeTimestamps || policy.removeComments || policy.removeExif || policy.fullSanitize)) {
         keep = false;
       }
 
@@ -178,9 +178,14 @@ export function sanitizePng(inputBytes, policy) {
     if (iendReached) break;
   }
   
-  if (!iendReached) {
-      // Allow it, some PNGs have trailing garbage, but we processed up to EOF.
-      result.warnings.push('IEND chunk not found before end of file.');
+  if (!iendReached || !hasIhdr || !hasIdat) {
+    result.status = 'malformed';
+    result.error = !hasIhdr
+      ? 'Missing IHDR chunk in PNG.'
+      : !hasIdat
+      ? 'Missing IDAT chunk (no image payload) in PNG.'
+      : 'Incomplete PNG: IEND chunk not found before end of file.';
+    return createResult(result);
   }
   
   // Calculate total length

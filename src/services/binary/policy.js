@@ -21,11 +21,13 @@ export function validatePolicy(policy = {}) {
     removeXmp: policy.removeXmp ?? true,
     removeIptc: policy.removeIptc ?? true,
     removeComments: policy.removeComments ?? true,
+    removeTimestamps: policy.removeTimestamps ?? true,
     removeIcc: policy.removeIcc ?? (isFullSanitize ? true : false),
     preserveOrientation: policy.preserveOrientation ?? true,
     preserveColorSpace: policy.preserveColorSpace ?? true,
     // C2PA / JUMBF Content Credentials are stripped by default on every clean.
     removeC2pa: policy.removeC2pa ?? true,
+    keepTags: Array.isArray(policy.keepTags) ? policy.keepTags : [],
     fullSanitize: isFullSanitize,
   };
 
@@ -37,6 +39,10 @@ export function validatePolicy(policy = {}) {
  */
 export function createResult({
   format,
+  inputFormat = format,
+  outputFormat = format,
+  mimeType = null,
+  isLossless = true,
   inputBytes,
   outputBytes = null,
   removedSegments = [],
@@ -46,8 +52,24 @@ export function createResult({
   error = null,
   status = 'success', // 'success', 'unsupported', 'malformed', 'unsafe', 'fallback-required'
 }) {
+  const resolvedMime = mimeType || (
+    outputFormat === 'jpeg' ? 'image/jpeg' :
+    outputFormat === 'png' ? 'image/png' :
+    outputFormat === 'webp' ? 'image/webp' :
+    outputFormat === 'gif' ? 'image/gif' :
+    outputFormat === 'avif' ? 'image/avif' :
+    outputFormat === 'mp4' ? 'video/mp4' :
+    outputFormat === 'mov' ? 'video/quicktime' :
+    outputFormat === 'pdf' ? 'application/pdf' :
+    'application/octet-stream'
+  );
+
   return {
-    format,
+    format: outputFormat || format,
+    inputFormat: inputFormat || format,
+    outputFormat: outputFormat || format,
+    mimeType: resolvedMime,
+    isLossless,
     inputBytes,
     outputBytes,
     removedSegments,
@@ -58,16 +80,7 @@ export function createResult({
     status,
     get outputBlob() {
       if (!outputBytes) return null;
-      let mimeType = 'application/octet-stream';
-      if (format === 'jpeg') mimeType = 'image/jpeg';
-      if (format === 'png') mimeType = 'image/png';
-      if (format === 'webp') mimeType = 'image/webp';
-      if (format === 'gif') mimeType = 'image/gif';
-      if (format === 'avif') mimeType = 'image/avif';
-      if (format === 'mp4') mimeType = 'video/mp4';
-      if (format === 'mov') mimeType = 'video/quicktime';
-      if (format === 'pdf') mimeType = 'application/pdf';
-      return new Blob([outputBytes], { type: mimeType });
+      return new Blob([outputBytes], { type: resolvedMime });
     },
   };
 }

@@ -29,21 +29,33 @@ export class WorkerPool {
   dispatch(type, payload, options = {}) {
     return new Promise((resolve, reject) => {
       const id = `job_${++jobIdCounter}`;
-      
+      let settled = false;
+
+      const settle = (action, val) => {
+        if (settled) return;
+        settled = true;
+        if (job.signal && job.abortHandler) {
+          job.signal.removeEventListener('abort', job.abortHandler);
+          job.abortHandler = null;
+        }
+        if (action === 'resolve') resolve(val);
+        else reject(val);
+      };
+
       const job = {
         id,
         type,
         payload,
         transfer: options.transfer || [],
-        resolve,
-        reject,
+        resolve: (val) => settle('resolve', val),
+        reject: (err) => settle('reject', err),
         onProgress: options.onProgress,
         signal: options.signal,
       };
 
       if (job.signal) {
         if (job.signal.aborted) {
-          return reject(new Error('CANCELLED'));
+          return job.reject(new Error('CANCELLED'));
         }
         
         job.abortHandler = () => {
@@ -63,10 +75,6 @@ export class WorkerPool {
     const job = this.activeJobs.get(jobId);
     if (!job) return; // already done or cancelled
 
-    if (job.signal && job.abortHandler) {
-      job.signal.removeEventListener('abort', job.abortHandler);
-    }
-    
     this.activeJobs.delete(jobId);
     
     // Is it in the queue?
@@ -80,15 +88,7 @@ export class WorkerPool {
     // It's currently running on a worker
     const workerObj = this.workers.find(w => w.activeJobId === jobId);
     if (workerObj) {
-      // Send cancel message
-      workerObj.worker.postMessage({ id: jobId, type: 'CANCEL' });
-      // We don't immediately resolve/reject here; we let the worker return CANCELLED status,
-      // OR we just reject it proactively. Proactively rejecting is safer for the UI.
       job.reject(new Error('CANCELLED'));
-      
-      // The worker will eventually finish and return CANCELLED, freeing the slot.
-      // But to be robust against hung workers, we could optionally terminate it immediately.
-      // Since C2PA WASM might hang, let's aggressively terminate if cancelled to free resources.
       this.terminateWorker(workerObj);
     }
   }

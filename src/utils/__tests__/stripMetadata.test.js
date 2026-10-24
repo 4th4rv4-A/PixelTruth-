@@ -154,5 +154,24 @@ describe('stripMetadata service functions', () => {
         expect.any(Object)
       );
     });
+
+    it('attaches output contract metadata to returned Blob', async () => {
+      const file = new File(['mock'], 'photo.heic', { type: 'image/heic' });
+      imagePool.dispatch.mockResolvedValueOnce({
+        buffer: new Uint8Array([0xFF, 0xD8, 0xFF, 0xD9]).buffer,
+        inputFormat: 'heic',
+        outputFormat: 'jpeg',
+        mimeType: 'image/jpeg',
+        isLossless: false,
+        warnings: ['HEIC converted to clean JPEG.'],
+      });
+
+      const blob = await cleanImageFile(file);
+      expect(blob.type).toBe('image/jpeg');
+      expect(blob.inputFormat).toBe('heic');
+      expect(blob.outputFormat).toBe('jpeg');
+      expect(blob.isLossless).toBe(false);
+      expect(blob.warnings).toEqual(['HEIC converted to clean JPEG.']);
+    });
   });
 });

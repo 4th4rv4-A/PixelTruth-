@@ -55,13 +55,13 @@ function createMockJpegWithFullMetadata(orientation = 6) {
   view.setUint16(10, 0x010F, true);
   view.setUint16(12, 2, true); // ASCII
   view.setUint32(14, 4, true);
-  tiff[18] = 0x53; tiff[19] = 0x4F; tiff[20] = 0x4E; tiff[21] = 0x59; // SONY
+  tiff[18] = 0x53; tiff[19] = 0x4F; tiff[20] = 0x4E; tiff[21] = 0x00; // SON\0
 
   // Model 0x0110
   view.setUint16(22, 0x0110, true);
   view.setUint16(24, 2, true);
   view.setUint32(26, 4, true);
-  tiff[30] = 0x41; tiff[31] = 0x37; tiff[32] = 0x52; tiff[33] = 0x35; // A7R5
+  tiff[30] = 0x41; tiff[31] = 0x37; tiff[32] = 0x52; tiff[33] = 0x00; // A7R\0
 
   // Orientation 0x0112
   view.setUint16(34, 0x0112, true);
@@ -494,6 +494,123 @@ describe('Binary Sanitizer Engine', () => {
       expect(result.status).toBe('success');
       expect(result.removedSegments.some((s) => s.type === 'TRAILING_PAYLOAD')).toBe(true);
       expect(result.outputBytes.length).toBeLessThan(pngWithTrailing.length);
+    });
+  });
+
+  describe('Stage 1 Hardening Regressions', () => {
+    it('preserves non-C2PA vendor APP11 segments in JPEG', () => {
+      const vendorData = new TextEncoder().encode('CanonCustomVendorDataPayload123');
+      const len = 2 + vendorData.length;
+      const app11 = new Uint8Array(2 + len);
+      app11[0] = 0xFF; app11[1] = 0xEB; // APP11
+      app11[2] = (len >> 8) & 0xFF; app11[3] = len & 0xFF;
+      app11.set(vendorData, 4);
+
+      const sos = new Uint8Array([0xFF, 0xDA, 0x00, 0x04, 0x11, 0x22, 0xFF, 0xD9]);
+      const jpeg = new Uint8Array(2 + app11.length + sos.length);
+      jpeg[0] = 0xFF; jpeg[1] = 0xD8;
+      jpeg.set(app11, 2);
+      jpeg.set(sos, 2 + app11.length);
+
+      const result = sanitizeJpeg(jpeg, { removeC2pa: true });
+      expect(result.status).toBe('success');
+      expect(result.preservedSegments.some(s => s.type === 'APP11_VENDOR')).toBe(true);
+      expect(result.removedSegments.some(s => s.type === 'APP11_C2PA')).toBe(false);
+    });
+
+    it('rejects truncated JPEG missing EOI', () => {
+      const baseJpeg = createMockJpeg();
+      // Drop the last 2 bytes (0xFF 0xD9)
+      const truncated = baseJpeg.subarray(0, baseJpeg.length - 2);
+      const result = sanitizeJpeg(truncated, { removeExif: true });
+      expect(result.status).toBe('malformed');
+      expect(result.error).toMatch(/never reached eoi/i);
+    });
+
+    it('reconstructs only approved tags during selective JPEG cleaning', async () => {
+      const input = createMockJpegWithFullMetadata(6);
+      const policy = {
+        removeExif: true,
+        keepTags: ['Make', 'Model'],
+        preserveOrientation: true
+      };
+
+      const result = sanitizeJpeg(input, policy);
+      expect(result.status).toBe('success');
+      expect(result.preservedSegments.some(s => s.type === 'APP1_EXIF_SELECTIVE')).toBe(true);
+
+      const parsed = await exifr.parse(result.outputBytes, { tiff: true, exif: true, gps: true });
+      expect(parsed.Make).toBe('SON');
+      expect(parsed.Model).toBe('A7R');
+      expect(parsed.Orientation).toBe('Rotate 90 CW');
+      // DateTimeOriginal and GPS must NOT be present
+      expect(parsed.DateTimeOriginal).toBeUndefined();
+      expect(parsed.GPSLatitudeRef).toBeUndefined();
+    });
+
+    it('removes PNG tIME chunk when removeTimestamps is true', () => {
+      // Build PNG with tIME chunk
+      const sig = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+      const ihdr = [0, 0, 0, 0, 0x49, 0x48, 0x44, 0x52, 0, 0, 0, 0];
+      const timeChunk = [
+        0, 0, 0, 7, // len 7
+        0x74, 0x49, 0x4D, 0x45, // tIME
+        0x07, 0xEA, 10, 23, 12, 0, 0, // 2026-10-23 12:00:00
+        0, 0, 0, 0 // crc
+      ];
+      const idat = [0, 0, 0, 4, 0x49, 0x44, 0x41, 0x54, 9, 9, 9, 9, 0, 0, 0, 0];
+      const iend = [0, 0, 0, 0, 0x49, 0x45, 0x4E, 0x44, 0, 0, 0, 0];
+
+      const raw = new Uint8Array([...sig, ...ihdr, ...timeChunk, ...idat, ...iend]);
+      const result = sanitizePng(raw, { removeTimestamps: true, removeExif: false });
+
+      expect(result.status).toBe('success');
+      expect(result.removedSegments.some(s => s.type === 'Chunk_tIME')).toBe(true);
+    });
+
+    it('rejects PNG missing IDAT chunk', () => {
+      const sig = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+      const ihdr = [0, 0, 0, 0, 0x49, 0x48, 0x44, 0x52, 0, 0, 0, 0];
+      const iend = [0, 0, 0, 0, 0x49, 0x45, 0x4E, 0x44, 0, 0, 0, 0];
+      const raw = new Uint8Array([...sig, ...ihdr, ...iend]);
+
+      const result = sanitizePng(raw, {});
+      expect(result.status).toBe('malformed');
+      expect(result.error).toMatch(/missing idat/i);
+    });
+
+    it('removes C2PA chunk in WebP container', () => {
+      // Build WebP with RIFF, WEBP, C2PA, and VP8 (12 + 12 + 12 = 36 total, 28 payload)
+      const header = [0x52, 0x49, 0x46, 0x46, 28, 0, 0, 0, 0x57, 0x45, 0x42, 0x50];
+      const c2paChunk = [0x43, 0x32, 0x50, 0x41, 4, 0, 0, 0, 1, 2, 3, 4]; // 'C2PA'
+      const vp8Chunk = [0x56, 0x50, 0x38, 0x20, 4, 0, 0, 0, 9, 9, 9, 9]; // 'VP8 '
+
+      const raw = new Uint8Array([...header, ...c2paChunk, ...vp8Chunk]);
+      const result = sanitizeWebp(raw, { removeC2pa: true });
+
+      expect(result.status).toBe('success');
+      expect(result.removedSegments.some(s => s.type === 'Chunk_C2PA')).toBe(true);
+    });
+
+    it('rejects WebP container missing image payload', () => {
+      const header = [0x52, 0x49, 0x46, 0x46, 16, 0, 0, 0, 0x57, 0x45, 0x42, 0x50];
+      const exifChunk = [0x45, 0x58, 0x49, 0x46, 4, 0, 0, 0, 1, 2, 3, 4];
+      const raw = new Uint8Array([...header, ...exifChunk]);
+
+      const result = sanitizeWebp(raw, {});
+      expect(result.status).toBe('malformed');
+      expect(result.error).toMatch(/no image payload/i);
+    });
+
+    it('populates consistent output contract on result object', () => {
+      const jpeg = createMockJpeg();
+      const result = sanitizeImage(jpeg, { removeExif: true });
+      expect(result.inputFormat).toBe('jpeg');
+      expect(result.outputFormat).toBe('jpeg');
+      expect(result.mimeType).toBe('image/jpeg');
+      expect(result.isLossless).toBe(true);
+      expect(result.outputBlob).toBeInstanceOf(Blob);
+      expect(result.outputBlob.type).toBe('image/jpeg');
     });
   });
 });

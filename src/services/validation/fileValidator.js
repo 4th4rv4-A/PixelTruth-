@@ -79,11 +79,19 @@ export async function validateHeaderSafety(file) {
     } else {
       const ftyp = textDecoder.decode(bytes.subarray(4, 8));
       if (ftyp === 'ftyp') {
-        const majorBrand = textDecoder.decode(bytes.subarray(8, 12));
-        const ftypLen = (bytes[0] << 24) | (bytes[1] << 16) | (bytes[2] << 8) | bytes[3];
+        let ftypLen = ((bytes[0] << 24) | (bytes[1] << 16) | (bytes[2] << 8) | bytes[3]) >>> 0;
+        let brandOffset = 8;
+        if (ftypLen === 1 && bytes.length >= 16) {
+          const high = ((bytes[8] << 24) | (bytes[9] << 16) | (bytes[10] << 8) | bytes[11]) >>> 0;
+          const low = ((bytes[12] << 24) | (bytes[13] << 16) | (bytes[14] << 8) | bytes[15]) >>> 0;
+          ftypLen = high * 0x100000000 + low;
+          brandOffset = 16;
+        }
+
+        const majorBrand = textDecoder.decode(bytes.subarray(brandOffset, brandOffset + 4));
         let isAvif = majorBrand === 'avif' || majorBrand === 'avis';
-        if (!isAvif && ftypLen > 16) {
-          for (let b = 16; b + 4 <= Math.min(bytes.length, ftypLen); b += 4) {
+        if (!isAvif && ftypLen > brandOffset + 8) {
+          for (let b = brandOffset + 8; b + 4 <= Math.min(bytes.length, ftypLen); b += 4) {
             const brand = textDecoder.decode(bytes.subarray(b, b + 4));
             if (brand === 'avif' || brand === 'avis') {
               isAvif = true;
@@ -265,17 +273,12 @@ function parseWebp(bytes, result) {
     if (offset + 8 > bytes.length) break;
 
     const chunkType = textDecoder.decode(bytes.subarray(offset, offset + 4));
-    const chunkLen = bytes[offset + 4] | (bytes[offset + 5] << 8) | (bytes[offset + 6] << 16) | (bytes[offset + 7] << 24);
+    const chunkLen = ((bytes[offset + 4]) | (bytes[offset + 5] << 8) | (bytes[offset + 6] << 16) | (bytes[offset + 7] << 24)) >>> 0;
     
-    if (chunkLen < 0) {
-      result.reasons.push('MALFORMED_CONTAINER');
-      return;
-    }
-
     const paddedLen = chunkLen % 2 !== 0 ? chunkLen + 1 : chunkLen;
 
     if (chunkType === 'VP8X') {
-      if (offset + 14 <= bytes.length) {
+      if (offset + 18 <= bytes.length) {
         // 24-bit canvas width minus one
         const w = bytes[offset + 12] | (bytes[offset + 13] << 8) | (bytes[offset + 14] << 16);
         // 24-bit canvas height minus one
@@ -283,6 +286,9 @@ function parseWebp(bytes, result) {
         result.width = w + 1;
         result.height = h + 1;
         return; // VP8X defines canvas size, done.
+      } else {
+        result.reasons.push('MALFORMED_CONTAINER');
+        return;
       }
     } else if (chunkType === 'VP8 ') {
       // VP8 keyframe header is 10 bytes in. (offset+8 is chunk data)
@@ -352,26 +358,37 @@ function parseBmff(bytes, result) {
   while (offset < bytes.length) {
     if (offset + 8 > bytes.length) break;
     
-    let size = (bytes[offset] << 24) | (bytes[offset + 1] << 16) | (bytes[offset + 2] << 8) | bytes[offset + 3];
+    const rawSize = ((bytes[offset] << 24) | (bytes[offset + 1] << 16) | (bytes[offset + 2] << 8) | bytes[offset + 3]) >>> 0;
     const type = textDecoder.decode(bytes.subarray(offset + 4, offset + 8));
 
-    if (size === 1) { // 64-bit size
-      if (offset + 16 > bytes.length) break;
-      size = (bytes[offset + 12] << 24) | (bytes[offset + 13] << 16) | (bytes[offset + 14] << 8) | bytes[offset + 15];
-      offset += 16;
-    } else {
-      offset += 8;
+    let size = rawSize;
+    let headerSize = 8;
+
+    if (rawSize === 1) { // 64-bit size
+      if (offset + 16 > bytes.length) {
+        result.reasons.push('MALFORMED_CONTAINER');
+        break;
+      }
+      const high = ((bytes[offset + 8] << 24) | (bytes[offset + 9] << 16) | (bytes[offset + 10] << 8) | bytes[offset + 11]) >>> 0;
+      const low = ((bytes[offset + 12] << 24) | (bytes[offset + 13] << 16) | (bytes[offset + 14] << 8) | bytes[offset + 15]) >>> 0;
+      if (high > 0x1FFFFF) {
+        result.reasons.push('MALFORMED_CONTAINER');
+        break;
+      }
+      size = high * 0x100000000 + low;
+      headerSize = 16;
+    } else if (rawSize === 0) {
+      size = bytes.length - offset;
     }
 
-    if (size === 0) {
+    if (size < headerSize) {
+      result.reasons.push('MALFORMED_CONTAINER');
       break; 
     }
 
-    let payloadSize = size - 8;
-    if (size === 1) payloadSize = size - 16;
-
     if (type === 'meta' || type === 'iprp' || type === 'ipco') {
       // Container boxes, dive into them
+      offset += headerSize;
       if (type === 'meta') {
         // meta has 4 byte version/flags
         offset += 4; 
@@ -381,15 +398,16 @@ function parseBmff(bytes, result) {
 
     if (type === 'ispe') {
       // ispe has 4 byte version/flags, then 4 byte width, 4 byte height
-      if (offset + 12 <= bytes.length) {
-        result.width = (bytes[offset + 4] << 24) | (bytes[offset + 5] << 16) | (bytes[offset + 6] << 8) | bytes[offset + 7];
-        result.height = (bytes[offset + 8] << 24) | (bytes[offset + 9] << 16) | (bytes[offset + 10] << 8) | bytes[offset + 11];
+      const ispeDataOffset = offset + headerSize;
+      if (ispeDataOffset + 12 <= bytes.length) {
+        result.width = ((bytes[ispeDataOffset + 4] << 24) | (bytes[ispeDataOffset + 5] << 16) | (bytes[ispeDataOffset + 6] << 8) | bytes[ispeDataOffset + 7]) >>> 0;
+        result.height = ((bytes[ispeDataOffset + 8] << 24) | (bytes[ispeDataOffset + 9] << 16) | (bytes[ispeDataOffset + 10] << 8) | bytes[ispeDataOffset + 11]) >>> 0;
         return; // found it
       }
     }
 
     // Skip box
-    offset += payloadSize;
+    offset += size;
   }
 
   if (result.width === 0) {

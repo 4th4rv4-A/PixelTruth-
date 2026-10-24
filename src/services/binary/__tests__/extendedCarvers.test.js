@@ -126,6 +126,50 @@ describe('Lossless Video Metadata Carver (videoCarver.js)', () => {
     expect(outStr).not.toContain('udta');
     expect(outStr).toContain('free');
   });
+
+  it('correctly parses 64-bit extended box size and processes moov', () => {
+    // 64-bit box: size indicator = 1, followed by 'free', followed by 8 bytes size = 24
+    const free64 = [
+      0x00, 0x00, 0x00, 0x01, // 64-bit indicator
+      0x66, 0x72, 0x65, 0x65, // 'free'
+      0x00, 0x00, 0x00, 0x00, // high 32 bits = 0
+      0x00, 0x00, 0x00, 0x18, // low 32 bits = 24
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 // 8 bytes padding to reach 24 total
+    ];
+
+    // Top-level ftyp box (16 bytes)
+    const ftyp = [
+      0x00, 0x00, 0x00, 0x10,
+      0x66, 0x74, 0x79, 0x70,
+      0x69, 0x73, 0x6F, 0x6D,
+      0x00, 0x00, 0x02, 0x00
+    ];
+
+    // Inside moov: udta box (16 bytes)
+    const udta = [
+      0x00, 0x00, 0x00, 0x10,
+      0x75, 0x64, 0x74, 0x61,
+      0xA9, 0x78, 0x79, 0x7A,
+      0x2B, 0x33, 0x37, 0x2E
+    ];
+
+    // moov box (24 bytes)
+    const moov = [
+      0x00, 0x00, 0x00, 0x18,
+      0x6D, 0x6F, 0x6F, 0x76,
+      ...udta
+    ];
+
+    const raw = new Uint8Array([...ftyp, ...free64, ...moov]);
+    const result = sanitizeVideo(raw);
+
+    expect(result.status).toBe('success');
+    expect(result.removedSegments).toContain('UDTA_USER_DATA');
+    expect(result.outputBytes.length).toBe(raw.length);
+
+    const textDecoder = new TextDecoder('ascii');
+    expect(textDecoder.decode(result.outputBytes)).not.toContain('udta');
+  });
 });
 
 describe('Lossless PDF Metadata Carver (pdfCarver.js)', () => {

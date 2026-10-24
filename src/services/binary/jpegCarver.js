@@ -1,4 +1,9 @@
-import { createResult } from './policy.js';
+import piexif from 'piexifjs';
+import { createResult, validatePolicy } from './policy.js';
+
+if (typeof window === 'undefined' && typeof self !== 'undefined') {
+  self.window = self;
+}
 
 const MARKERS = {
   SOI: 0xD8,
@@ -17,9 +22,11 @@ const textEncoder = new TextEncoder();
 const EXIF_SIG = textEncoder.encode("Exif\0\0");
 const XMP_SIG = textEncoder.encode("http://ns.adobe.com/xap/1.0/\0");
 const EXT_XMP_SIG = textEncoder.encode("http://ns.adobe.com/xmp/extension/\0");
+const EXT_XMP_ALT = textEncoder.encode("http://ns.adobe.com/xmp/extension/");
 const ICC_SIG = textEncoder.encode("ICC_PROFILE\0");
 const JUMBF_SIG = textEncoder.encode("JUMBF");
-
+const JUMB_SIG = textEncoder.encode("jumb");
+const C2PA_SIG = textEncoder.encode("c2pa");
 
 function bufferStartsWith(buffer, offset, signature) {
   if (offset + signature.length > buffer.length) return false;
@@ -27,6 +34,121 @@ function bufferStartsWith(buffer, offset, signature) {
     if (buffer[offset + i] !== signature[i]) return false;
   }
   return true;
+}
+
+function isJumbfOrC2paApp11(inputBytes, payloadOffset, segLen) {
+  const checkLen = Math.min(segLen - 2, 48);
+  for (let i = 0; i <= checkLen - 4; i++) {
+    const pos = payloadOffset + i;
+    if (
+      bufferStartsWith(inputBytes, pos, JUMB_SIG) ||
+      bufferStartsWith(inputBytes, pos, JUMBF_SIG) ||
+      bufferStartsWith(inputBytes, pos, C2PA_SIG)
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function getPiexifTagName(ifdName, tagId) {
+  const dict = piexif.TAGS ? (piexif.TAGS[ifdName] || (ifdName === '0th' ? piexif.TAGS.Image : null)) : null;
+  if (!dict) return null;
+  const tagInfo = dict[tagId];
+  if (!tagInfo) return null;
+  return typeof tagInfo === 'object' ? tagInfo.name : tagInfo;
+}
+
+/**
+ * Builds a selective APP1 EXIF segment containing ONLY approved tags from keepTags,
+ * plus Orientation and ColorSpace.
+ */
+export function buildSelectiveExifApp1(inputBytes, keepTags = [], targetOrientation = null, targetColorSpace = null) {
+  // Find SOS marker to extract only the header portion for piexif.load (saves memory)
+  let sosIdx = -1;
+  for (let i = 0; i < inputBytes.length - 1; i++) {
+    if (inputBytes[i] === 0xFF && inputBytes[i + 1] === MARKERS.SOS) {
+      sosIdx = i;
+      break;
+    }
+  }
+  if (sosIdx === -1) sosIdx = Math.min(inputBytes.length, 65536);
+
+  const headerChunk = new Uint8Array(sosIdx + 4);
+  headerChunk.set(inputBytes.subarray(0, sosIdx), 0);
+  headerChunk[sosIdx] = 0xFF; headerChunk[sosIdx + 1] = 0xDA; // SOS
+  headerChunk[sosIdx + 2] = 0x00; headerChunk[sosIdx + 3] = 0x02;
+
+  let binStr = '';
+  const chunkSize = 8192;
+  for (let i = 0; i < headerChunk.length; i += chunkSize) {
+    binStr += String.fromCharCode.apply(null, headerChunk.subarray(i, i + chunkSize));
+  }
+
+  let exifObj;
+  try {
+    exifObj = piexif.load(binStr);
+  } catch {
+    return buildMinimalExifApp1(targetOrientation, targetColorSpace);
+  }
+
+  const keepSet = new Set(keepTags);
+  const alwaysKeepIfd0 = { 0x0112: true }; // Orientation
+  const alwaysKeepExif = { 0xA001: true }; // ColorSpace
+
+  for (const ifdName of ['0th', 'Exif', 'GPS', '1st', 'Interop']) {
+    const ifdData = exifObj[ifdName];
+    if (!ifdData) continue;
+
+    for (const tagId of Object.keys(ifdData)) {
+      const numId = parseInt(tagId, 10);
+      if (ifdName === '0th' && alwaysKeepIfd0[numId] && targetOrientation !== null) {
+        ifdData[tagId] = targetOrientation;
+        continue;
+      }
+      if (ifdName === 'Exif' && alwaysKeepExif[numId] && targetColorSpace !== null) {
+        ifdData[tagId] = targetColorSpace;
+        continue;
+      }
+
+      const tagName = getPiexifTagName(ifdName, numId);
+      if (tagName && keepSet.has(tagName)) {
+        continue; // approved tag to retain
+      }
+
+      delete ifdData[tagId];
+    }
+  }
+
+  // Always delete thumbnails and interop
+  delete exifObj['1st'];
+  delete exifObj['thumbnail'];
+  delete exifObj['Interop'];
+
+  // Clean empty GPS if no GPS tag was retained
+  if (exifObj.GPS && Object.keys(exifObj.GPS).length === 0) {
+    delete exifObj.GPS;
+  }
+
+  try {
+    const dumped = piexif.dump(exifObj);
+    if (!dumped || dumped.length <= 8) {
+      return buildMinimalExifApp1(targetOrientation, targetColorSpace);
+    }
+
+    const app1Len = 2 + dumped.length;
+    const app1 = new Uint8Array(2 + app1Len);
+    app1[0] = 0xFF;
+    app1[1] = MARKERS.APP1;
+    app1[2] = (app1Len >> 8) & 0xFF;
+    app1[3] = app1Len & 0xFF;
+    for (let i = 0; i < dumped.length; i++) {
+      app1[4 + i] = dumped.charCodeAt(i) & 0xFF;
+    }
+    return app1;
+  } catch {
+    return buildMinimalExifApp1(targetOrientation, targetColorSpace);
+  }
 }
 
 /**
@@ -225,7 +347,8 @@ export function buildMinimalExifApp1(orientation, colorSpace) {
  * Parses and selectively copies JPEG segments, preserving SOS to EOI bitstream.
  * When stripping EXIF, preserves Orientation and ColorSpace by constructing a minimal APP1.
  */
-export function sanitizeJpeg(inputBytes, policy = {}) {
+export function sanitizeJpeg(inputBytes, rawPolicy = {}) {
+  const policy = validatePolicy(rawPolicy);
   const result = {
     format: 'jpeg',
     inputBytes,
@@ -244,8 +367,8 @@ export function sanitizeJpeg(inputBytes, policy = {}) {
     return createResult(result);
   }
 
-  const preserveOrientation = policy.preserveOrientation ?? true;
-  const preserveColorSpace = policy.preserveColorSpace ?? true;
+  const preserveOrientation = policy.preserveOrientation;
+  const preserveColorSpace = policy.preserveColorSpace;
 
   // Read Orientation and ColorSpace before carving
   const { orientation, colorSpace } = (preserveOrientation || preserveColorSpace)
@@ -348,7 +471,13 @@ export function sanitizeJpeg(inputBytes, policy = {}) {
         }
       }
 
-      const bitstreamEnd = eoiOffset !== -1 ? eoiOffset + 2 : len;
+      if (eoiOffset === -1) {
+        result.status = 'malformed';
+        result.error = 'Never reached EOI (End of Image). File may be truncated.';
+        return createResult(result);
+      }
+
+      const bitstreamEnd = eoiOffset + 2;
       outputChunks.push(inputBytes.subarray(offset, bitstreamEnd));
       result.preservedSegments.push({ type: 'SOS_AND_BITSTREAM', offset, size: bitstreamEnd - offset });
       sosReached = true;
@@ -369,15 +498,19 @@ export function sanitizeJpeg(inputBytes, policy = {}) {
         typeDesc = 'APP1_EXIF';
         if (policy.removeExif) {
           keep = false;
-          // Splice in minimal freshly built APP1 if Orientation or ColorSpace exist
-          if (!minimalApp1Injected && (targetOrientation !== null || targetColorSpace !== null)) {
-            const minimalApp1 = buildMinimalExifApp1(targetOrientation, targetColorSpace);
-            if (minimalApp1) {
-              outputChunks.push(minimalApp1);
+          // Splice in selective or minimal freshly built APP1
+          if (!minimalApp1Injected) {
+            const hasKeepTags = Array.isArray(policy.keepTags) && policy.keepTags.length > 0;
+            const app1ToInject = hasKeepTags
+              ? buildSelectiveExifApp1(inputBytes, policy.keepTags, targetOrientation, targetColorSpace)
+              : ((targetOrientation !== null || targetColorSpace !== null) ? buildMinimalExifApp1(targetOrientation, targetColorSpace) : null);
+
+            if (app1ToInject) {
+              outputChunks.push(app1ToInject);
               result.preservedSegments.push({
-                type: 'APP1_EXIF_MINIMAL',
+                type: hasKeepTags ? 'APP1_EXIF_SELECTIVE' : 'APP1_EXIF_MINIMAL',
                 offset,
-                size: minimalApp1.length,
+                size: app1ToInject.length,
               });
               minimalApp1Injected = true;
             }
@@ -385,7 +518,8 @@ export function sanitizeJpeg(inputBytes, policy = {}) {
         }
       } else if (
         bufferStartsWith(inputBytes, payloadOffset, XMP_SIG) ||
-        bufferStartsWith(inputBytes, payloadOffset, EXT_XMP_SIG)
+        bufferStartsWith(inputBytes, payloadOffset, EXT_XMP_SIG) ||
+        bufferStartsWith(inputBytes, payloadOffset, EXT_XMP_ALT)
       ) {
         typeDesc = 'APP1_XMP';
         if (policy.removeXmp) keep = false;
@@ -403,16 +537,12 @@ export function sanitizeJpeg(inputBytes, policy = {}) {
       typeDesc = `APP${marker - 0xE0}`;
       if (policy.removeIptc && marker === MARKERS.APP13) keep = false;
     } else if (marker === MARKERS.APP11) {
-      // APP11 almost always carries a C2PA / JUMBF Content Credentials manifest.
-      if (
-        bufferStartsWith(inputBytes, payloadOffset + 4, JUMBF_SIG) ||
-        bufferStartsWith(inputBytes, payloadOffset + 8, JUMBF_SIG) ||
-        bufferStartsWith(inputBytes, payloadOffset + 12, JUMBF_SIG)
-      ) {
+      // APP11: check if it carries a C2PA / JUMBF Content Credentials manifest.
+      if (isJumbfOrC2paApp11(inputBytes, payloadOffset, segLen)) {
         typeDesc = 'APP11_C2PA';
         if (policy.removeC2pa) keep = false;
       } else {
-        typeDesc = 'APP11_UNKNOWN';
+        typeDesc = 'APP11_VENDOR';
       }
     } else if (marker >= 0xE0 && marker <= 0xEF) {
       typeDesc = `APP${marker - 0xE0}`;

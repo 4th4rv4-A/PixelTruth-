@@ -1,11 +1,12 @@
-import { createResult } from './policy.js';
+import { createResult, validatePolicy } from './policy.js';
 
 const textDecoder = new TextDecoder('ascii');
 
 /**
  * Parses and selectively copies WebP RIFF chunks.
  */
-export function sanitizeWebp(inputBytes, policy) {
+export function sanitizeWebp(inputBytes, rawPolicy = {}) {
+  const policy = validatePolicy(rawPolicy);
   const result = {
     format: 'webp',
     inputBytes,
@@ -35,10 +36,12 @@ export function sanitizeWebp(inputBytes, policy) {
   }
 
   // File size declared in RIFF header
-  const declaredSize = inputBytes[4] | (inputBytes[5] << 8) | (inputBytes[6] << 16) | (inputBytes[7] << 24);
+  const declaredSize = ((inputBytes[4] | (inputBytes[5] << 8) | (inputBytes[6] << 16) | (inputBytes[7] << 24)) >>> 0);
   
   if (declaredSize + 8 > len && declaredSize > 0) {
-     result.warnings.push('Declared RIFF size is larger than actual file size (truncated file).');
+    result.status = 'malformed';
+    result.error = 'Declared RIFF size is larger than actual file size (truncated file).';
+    return createResult(result);
   }
 
   const outputChunks = [];
@@ -48,6 +51,7 @@ export function sanitizeWebp(inputBytes, policy) {
   let offset = 12;
   let segmentCount = 0;
   const MAX_SEGMENTS = 5000;
+  let hasImagePayload = false;
   
   // Track flags for VP8X if we remove EXIF/XMP/ICCP
   let vp8xChunk = null;
@@ -62,27 +66,25 @@ export function sanitizeWebp(inputBytes, policy) {
     }
 
     if (offset + 8 > len) {
-       // EOF reached or truncated header
-       break;
+       result.status = 'malformed';
+       result.error = 'Truncated chunk header.';
+       return createResult(result);
     }
 
     const chunkType = textDecoder.decode(inputBytes.subarray(offset, offset + 4));
-    const chunkSize = inputBytes[offset + 4] | (inputBytes[offset + 5] << 8) | (inputBytes[offset + 6] << 16) | (inputBytes[offset + 7] << 24);
-    
-    if (chunkSize < 0) {
-      result.status = 'malformed';
-      result.error = 'Invalid chunk length (too large).';
-      return createResult(result);
-    }
+    const chunkSize = ((inputBytes[offset + 4] | (inputBytes[offset + 5] << 8) | (inputBytes[offset + 6] << 16) | (inputBytes[offset + 7] << 24)) >>> 0);
 
     const paddedSize = chunkSize % 2 !== 0 ? chunkSize + 1 : chunkSize;
     const nextOffset = offset + 8 + paddedSize;
 
     if (nextOffset > len) {
-       result.warnings.push(`Chunk ${chunkType} exceeds file length (truncated).`);
-       // We'll copy what we have if it's an image chunk, or drop it.
-       // For safety, we stop parsing.
-       break;
+      result.status = 'malformed';
+      result.error = `Chunk ${chunkType} exceeds file length (truncated).`;
+      return createResult(result);
+    }
+
+    if (chunkType === 'VP8 ' || chunkType === 'VP8L' || chunkType === 'ANIM' || chunkType === 'ANMF') {
+      hasImagePayload = true;
     }
 
     let keep = true;
@@ -93,6 +95,8 @@ export function sanitizeWebp(inputBytes, policy) {
     } else if (chunkType === 'XMP ' && policy.removeXmp) {
       keep = false;
     } else if (chunkType === 'ICCP' && policy.removeIcc) {
+      keep = false;
+    } else if (chunkType === 'C2PA' && policy.removeC2pa) {
       keep = false;
     }
 
@@ -161,6 +165,12 @@ export function sanitizeWebp(inputBytes, policy) {
          newVp8xData[8] = newFlags;
          outputChunks[vp8xOffset] = newVp8xData;
      }
+  }
+
+  if (!hasImagePayload) {
+    result.status = 'malformed';
+    result.error = 'WebP container contains no image payload (VP8, VP8L, or ANIM).';
+    return createResult(result);
   }
 
   // Calculate total length

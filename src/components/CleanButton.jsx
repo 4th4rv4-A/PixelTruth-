@@ -12,6 +12,7 @@ export default function CleanButton({
   onFilesCleaned,
   sizeReport,
   setSizeReport,
+  batchCleanControllerRef,
 }) {
   const [processing, setProcessing] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0, stage: '' });
@@ -36,12 +37,17 @@ export default function CleanButton({
 
     const controller = new AbortController();
     abortControllerRef.current = controller;
+    if (batchCleanControllerRef) {
+      batchCleanControllerRef.current = controller;
+    }
 
     const cleanedResults = [];
     const sizeEntries = [];
     let errorCount = 0;
 
     for (let i = 0; i < files.length; i++) {
+      if (controller.signal.aborted) break;
+
       const item = files[i];
       setProgress({ current: i + 1, total: files.length, stage: 'PROCESSING' });
 
@@ -54,6 +60,8 @@ export default function CleanButton({
           },
           signal: controller.signal,
         });
+
+        if (controller.signal.aborted) break;
 
         const outputName = getOutputFilename(item.file.name, cleanedBlob.type);
 
@@ -69,7 +77,7 @@ export default function CleanButton({
           cleanedSize: cleanedBlob.size,
         });
       } catch (err) {
-        if (err.message === 'CANCELLED' || err.message === 'TIMEOUT') {
+        if (err.message === 'CANCELLED' || err.message === 'TIMEOUT' || controller.signal.aborted) {
           break;
         }
         errorCount++;
@@ -78,7 +86,10 @@ export default function CleanButton({
       }
     }
 
-    if (cleanedResults.length > 0) {
+    // Never trigger downloads or size reports if the operation was cancelled
+    if (controller.signal.aborted) {
+      toast('Processing cancelled', { icon: '🛑' });
+    } else if (cleanedResults.length > 0) {
       onFilesCleaned(cleanedResults);
 
       try {
@@ -100,24 +111,24 @@ export default function CleanButton({
         toast.error(`Download failed: ${err.message || 'Unknown error'}`);
         console.error('Download failed:', err);
       }
-    }
 
-
-    if (controller.signal.aborted) {
-      toast('Processing cancelled', { icon: '🛑' });
-    } else if (errorCount > 0 && cleanedResults.length > 0) {
-      toast(`${cleanedResults.length} file${cleanedResults.length === 1 ? '' : 's'} cleaned, ${errorCount} failed`, {
-        icon: '⚠️',
-      });
-    } else if (errorCount > 0 && cleanedResults.length === 0) {
+      if (errorCount > 0) {
+        toast(`${cleanedResults.length} file${cleanedResults.length === 1 ? '' : 's'} cleaned, ${errorCount} failed`, {
+          icon: '⚠️',
+        });
+      } else {
+        toast.success(`${cleanedResults.length} file${cleanedResults.length === 1 ? '' : 's'} cleaned successfully!`);
+      }
+    } else if (errorCount > 0) {
       toast.error('All files failed to process.');
-    } else if (cleanedResults.length > 0) {
-      toast.success(`${cleanedResults.length} file${cleanedResults.length === 1 ? '' : 's'} cleaned successfully!`);
     }
 
     setProcessing(false);
     setProgress({ current: 0, total: 0, stage: '' });
     abortControllerRef.current = null;
+    if (batchCleanControllerRef) {
+      batchCleanControllerRef.current = null;
+    }
   };
 
   const handleSaveAllZip = async () => {

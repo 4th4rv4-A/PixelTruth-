@@ -49,10 +49,10 @@ export function sanitizeVideo(inputBytes, _policy = {}) {
   let moovFound = false;
 
   while (offset + 8 <= len) {
-    let boxSize = (outputBytes[offset] << 24) |
-                  (outputBytes[offset + 1] << 16) |
-                  (outputBytes[offset + 2] << 8) |
-                  outputBytes[offset + 3];
+    let boxSize = ((outputBytes[offset] << 24) |
+                   (outputBytes[offset + 1] << 16) |
+                   (outputBytes[offset + 2] << 8) |
+                   outputBytes[offset + 3]) >>> 0;
 
     const boxType = textDecoder.decode(outputBytes.subarray(offset + 4, offset + 8));
 
@@ -60,10 +60,16 @@ export function sanitizeVideo(inputBytes, _policy = {}) {
     if (boxSize === 1) {
       // 64-bit size
       if (offset + 16 > len) break;
-      boxSize = (outputBytes[offset + 12] << 24) |
-                (outputBytes[offset + 13] << 16) |
-                (outputBytes[offset + 14] << 8) |
-                outputBytes[offset + 15];
+      const high = ((outputBytes[offset + 8] << 24) |
+                    (outputBytes[offset + 9] << 16) |
+                    (outputBytes[offset + 10] << 8) |
+                    outputBytes[offset + 11]) >>> 0;
+      const low = ((outputBytes[offset + 12] << 24) |
+                   (outputBytes[offset + 13] << 16) |
+                   (outputBytes[offset + 14] << 8) |
+                   outputBytes[offset + 15]) >>> 0;
+      if (high > 0x1FFFFF) break;
+      boxSize = high * 0x100000000 + low;
       headerSize = 16;
     } else if (boxSize === 0) {
       // Box extends to end of file
@@ -83,20 +89,26 @@ export function sanitizeVideo(inputBytes, _policy = {}) {
       const moovEnd = offset + boxSize;
 
       while (moovOffset + 8 <= moovEnd) {
-        let childSize = (outputBytes[moovOffset] << 24) |
-                        (outputBytes[moovOffset + 1] << 16) |
-                        (outputBytes[moovOffset + 2] << 8) |
-                        outputBytes[moovOffset + 3];
+        let childSize = ((outputBytes[moovOffset] << 24) |
+                         (outputBytes[moovOffset + 1] << 16) |
+                         (outputBytes[moovOffset + 2] << 8) |
+                         outputBytes[moovOffset + 3]) >>> 0;
 
         const childType = textDecoder.decode(outputBytes.subarray(moovOffset + 4, moovOffset + 8));
 
         let childHeaderSize = 8;
         if (childSize === 1) {
           if (moovOffset + 16 > moovEnd) break;
-          childSize = (outputBytes[moovOffset + 12] << 24) |
-                      (outputBytes[moovOffset + 13] << 16) |
-                      (outputBytes[moovOffset + 14] << 8) |
-                      outputBytes[moovOffset + 15];
+          const high = ((outputBytes[moovOffset + 8] << 24) |
+                        (outputBytes[moovOffset + 9] << 16) |
+                        (outputBytes[moovOffset + 10] << 8) |
+                        outputBytes[moovOffset + 11]) >>> 0;
+          const low = ((outputBytes[moovOffset + 12] << 24) |
+                       (outputBytes[moovOffset + 13] << 16) |
+                       (outputBytes[moovOffset + 14] << 8) |
+                       outputBytes[moovOffset + 15]) >>> 0;
+          if (high > 0x1FFFFF) break;
+          childSize = high * 0x100000000 + low;
           childHeaderSize = 16;
         } else if (childSize === 0) {
           childSize = moovEnd - moovOffset;
