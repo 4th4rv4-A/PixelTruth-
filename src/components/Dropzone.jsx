@@ -56,7 +56,7 @@ export default function Dropzone({
         if (!result.valid) {
           const reason = result.reasons[0];
           if (reason === 'FILE_TOO_LARGE') toast.error(`"${file.name}" exceeds 50 MB limit`);
-          else if (reason === 'INVALID_SIGNATURE') toast.error(`"${file.name}" — unsupported format. Use JPEG, PNG, WebP, or HEIC.`);
+          else if (reason === 'INVALID_SIGNATURE') toast.error(`"${file.name}" — unsupported format. Use JPEG, PNG, WebP, AVIF, GIF, or HEIC.`);
           else if (reason === 'UNSUPPORTED_FORMAT') toast.error(`"${file.name}" is an unsupported format.`);
           else if (reason === 'DIMENSIONS_UNKNOWN') toast.error(`"${file.name}" dimensions could not be safely verified.`);
           else if (reason === 'PIXEL_LIMIT_EXCEEDED') toast.error(`"${file.name}" dimensions are too large (exceeds 64MP safe limit).`);
@@ -68,8 +68,8 @@ export default function Dropzone({
           continue;
         }
 
-        if (!['jpeg', 'png', 'webp', 'heic'].includes(result.format)) {
-          toast.error(`"${file.name}" — unsupported format. Use JPEG, PNG, WebP, or HEIC.`);
+        if (!['jpeg', 'png', 'webp', 'heic', 'gif', 'avif'].includes(result.format)) {
+          toast.error(`"${file.name}" — unsupported format. Use JPEG, PNG, WebP, AVIF, GIF, or HEIC.`);
           release(1);
           continue;
         }

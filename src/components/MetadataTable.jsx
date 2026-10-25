@@ -38,6 +38,14 @@ export default function MetadataTable({
 }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [copiedKey, setCopiedKey] = useState(null);
+  const [collapsedGroups, setCollapsedGroups] = useState({});
+
+  const toggleGroupCollapse = (groupName) => {
+    setCollapsedGroups((prev) => ({
+      ...prev,
+      [groupName]: !prev[groupName],
+    }));
+  };
 
   const c2paRows = Array.isArray(metadata.__c2pa) ? metadata.__c2pa : [];
 
@@ -207,6 +215,22 @@ export default function MetadataTable({
         </div>
       </div>
 
+      {/* Live Search Result Counter */}
+      {query && (
+        <div className="text-xs text-ink-500 dark:text-ink-400 font-mono px-1 flex items-center justify-between">
+          <span>
+            Showing {filteredEntries.length} of {entries.length} tags matching &ldquo;{searchQuery}&rdquo;
+          </span>
+          <button
+            type="button"
+            onClick={() => setSearchQuery('')}
+            className="text-safelight-600 hover:underline cursor-pointer"
+          >
+            Clear filter
+          </button>
+        </div>
+      )}
+
       {/* C2PA Manifest Section */}
       {c2paRows.length > 0 && (
         <div className="frame p-4">
@@ -251,19 +275,24 @@ export default function MetadataTable({
               </tr>
             </thead>
             <tbody>
-              {sortedGroups.map(([group, { entries: groupEntries }]) => (
-                <GroupRows
-                  key={group}
-                  group={group}
-                  entries={groupEntries}
-                  keepTags={keepTags}
-                  onToggleTag={onToggleTag}
-                  isJpeg={isJpeg}
-                  isAlwaysKept={isAlwaysKept}
-                  copiedKey={copiedKey}
-                  onCopyValue={handleCopyValue}
-                />
-              ))}
+              {sortedGroups.map(([group, { entries: groupEntries }]) => {
+                const isCollapsed = !query && Boolean(collapsedGroups[group]);
+                return (
+                  <GroupRows
+                    key={group}
+                    group={group}
+                    entries={groupEntries}
+                    keepTags={keepTags}
+                    onToggleTag={onToggleTag}
+                    isJpeg={isJpeg}
+                    isAlwaysKept={isAlwaysKept}
+                    copiedKey={copiedKey}
+                    onCopyValue={handleCopyValue}
+                    isCollapsed={isCollapsed}
+                    onToggleCollapse={() => toggleGroupCollapse(group)}
+                  />
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -281,18 +310,50 @@ function GroupRows({
   isAlwaysKept,
   copiedKey,
   onCopyValue,
+  isCollapsed,
+  onToggleCollapse,
 }) {
   return (
     <>
       <tr>
         <td
           colSpan={4}
-          className="px-4 pt-3 pb-1.5 text-xs font-bold text-ink-700 dark:text-ink-200 bg-ink-100 dark:bg-ink-800"
+          className="p-0 border-t border-b border-ink-200 dark:border-ink-750"
         >
-          {group}
+          <button
+            type="button"
+            onClick={onToggleCollapse}
+            aria-expanded={!isCollapsed}
+            aria-label={`${isCollapsed ? 'Expand' : 'Collapse'} ${group} section`}
+            className="w-full px-4 pt-2.5 pb-2 text-xs font-bold text-ink-700 dark:text-ink-200 bg-ink-100 dark:bg-ink-800 hover:bg-ink-200 dark:hover:bg-ink-750 transition-colors flex items-center justify-between cursor-pointer select-none group/header text-left"
+          >
+            <span className="flex items-center gap-2">
+              <svg
+                className={`w-3.5 h-3.5 text-ink-500 transition-transform duration-200 ${
+                  isCollapsed ? '-rotate-90' : 'rotate-0'
+                }`}
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+              <span>{group}</span>
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-medium bg-ink-200/80 dark:bg-ink-700/80 text-ink-600 dark:text-ink-300">
+                {entries.length} {entries.length === 1 ? 'tag' : 'tags'}
+              </span>
+            </span>
+            <span className="text-[10px] font-mono uppercase tracking-wider text-ink-400 dark:text-ink-500 group-hover/header:text-ink-700 dark:group-hover/header:text-ink-300 transition-colors">
+              {isCollapsed ? '▶ Expand' : '▼ Collapse'}
+            </span>
+          </button>
         </td>
       </tr>
-      {entries.map(([key, _rawVal, formattedVal]) => {
+      {!isCollapsed &&
+        entries.map(([key, _rawVal, formattedVal]) => {
         const alwaysKept = isAlwaysKept(key);
         const kept = alwaysKept || keepTags.includes(key);
         const checkboxDisabled = alwaysKept || !isJpeg;

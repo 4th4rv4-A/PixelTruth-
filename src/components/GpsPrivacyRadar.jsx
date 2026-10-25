@@ -25,6 +25,7 @@ export default function GpsPrivacyRadar({
   // When file is cleaned, it automatically defaults to 'redacted' unless explicitly overridden by user
   const [userOverrideMode, setUserOverrideMode] = useState(null);
   const [showMapEmbed, setShowMapEmbed] = useState(false);
+  const [isMapLoading, setIsMapLoading] = useState(true);
   const [copied, setCopied] = useState(false);
 
   const viewMode = userOverrideMode ?? (isCleaned ? 'redacted' : 'exposed');
@@ -65,6 +66,13 @@ export default function GpsPrivacyRadar({
     } catch {
       toast.error('Failed to copy coordinates');
     }
+  };
+
+  const handleToggleMap = () => {
+    if (!showMapEmbed) {
+      setIsMapLoading(true);
+    }
+    setShowMapEmbed((prev) => !prev);
   };
 
   // Safe bounding box for OpenStreetMap embed (approx ~500m area)
@@ -413,7 +421,11 @@ export default function GpsPrivacyRadar({
                   <button
                     type="button"
                     onClick={handleCopyCoords}
-                    className="text-[10px] font-bold text-safelight-600 dark:text-safelight-400 hover:underline flex items-center gap-1"
+                    className={`text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer ${
+                      copied
+                        ? 'px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30'
+                        : 'text-safelight-600 dark:text-safelight-400 hover:underline'
+                    }`}
                     title="Copy coordinates to clipboard"
                   >
                     <span>{copied ? '✓ Copied' : 'Copy'}</span>
@@ -536,8 +548,8 @@ export default function GpsPrivacyRadar({
                 {/* Toggle Interactive Map Embed */}
                 <button
                   type="button"
-                  onClick={() => setShowMapEmbed(!showMapEmbed)}
-                  className={`px-2.5 py-1.5 rounded border text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-2xs ${
+                  onClick={handleToggleMap}
+                  className={`px-2.5 py-1.5 rounded border text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-2xs cursor-pointer ${
                     showMapEmbed
                       ? 'bg-rose-100 dark:bg-rose-950/60 border-rose-300 dark:border-rose-700 text-rose-800 dark:text-rose-200'
                       : 'bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/40'
@@ -578,20 +590,33 @@ export default function GpsPrivacyRadar({
             <button
               type="button"
               onClick={() => setShowMapEmbed(false)}
-              className="text-xs font-semibold text-ink-500 hover:text-ink-800 dark:hover:text-ink-200"
+              className="text-xs font-semibold text-ink-500 hover:text-ink-800 dark:hover:text-ink-200 cursor-pointer"
             >
               ✕ Close
             </button>
           </div>
 
-          <div className="w-full h-64 rounded-md overflow-hidden border border-ink-300 dark:border-ink-700 relative bg-ink-100 dark:bg-ink-900 shadow-inner">
+          <div className="w-full h-64 rounded-md overflow-hidden border border-ink-300 dark:border-ink-700 relative bg-ink-950 shadow-inner">
+            {isMapLoading && (
+              <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-ink-950 text-ink-400 gap-3">
+                <div className="relative w-9 h-9 flex items-center justify-center">
+                  <div className="absolute inset-0 rounded-full border-2 border-rose-500/20 animate-ping" />
+                  <div className="w-7 h-7 rounded-full border-2 border-t-rose-500 border-r-rose-500/40 border-b-rose-500/10 border-l-rose-500/20 animate-spin" />
+                </div>
+                <div className="text-center font-mono">
+                  <div className="text-xs font-semibold text-rose-400">Loading Tactical Map Preview...</div>
+                  <div className="text-[10px] text-ink-500">Fetching OpenStreetMap tiles for {decimalCoords}</div>
+                </div>
+              </div>
+            )}
             <iframe
               title="OpenStreetMap Location Preview"
               width="100%"
               height="100%"
               loading="lazy"
               src={embedUrl}
-              className="border-0 w-full h-full"
+              onLoad={() => setIsMapLoading(false)}
+              className={`border-0 w-full h-full transition-opacity duration-300 ${isMapLoading ? 'opacity-0' : 'opacity-100'}`}
             />
           </div>
 

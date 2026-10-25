@@ -282,20 +282,25 @@ export default function FileQueue({
 
                   {showLosslessDetails && (
                     <div className="pt-2 border-t border-emerald-200 dark:border-emerald-800/40 grid grid-cols-1 sm:grid-cols-2 gap-3 text-ink-700 dark:text-ink-300 font-mono text-[11px]">
-                      <div className="p-2 rounded bg-white dark:bg-ink-900/80 border border-ink-200 dark:border-ink-800">
+                      <div className="p-2.5 rounded bg-white dark:bg-ink-900/80 border border-ink-200 dark:border-ink-800 space-y-1">
                         <p className="font-bold text-rose-600 dark:text-rose-400 mb-1">Before Cleaning</p>
-                        <ul className="space-y-0.5 list-disc list-inside text-ink-600 dark:text-ink-400">
+                        <ul className="space-y-1 list-disc list-inside text-ink-600 dark:text-ink-400">
                           <li>EXIF & GPS metadata embedded in container</li>
                           <li>Camera serial & capture timestamp present</li>
-                          <li>Total file size: {formatSize(selectedItem.file.size)}</li>
+                          <li>Total container size: {formatSize(selectedItem.file.size)}</li>
                         </ul>
                       </div>
-                      <div className="p-2 rounded bg-white dark:bg-ink-900/80 border border-ink-200 dark:border-ink-800">
-                        <p className="font-bold text-emerald-600 dark:text-emerald-400 mb-1">After Cleaning</p>
-                        <ul className="space-y-0.5 list-disc list-inside text-ink-600 dark:text-ink-400">
+                      <div className="p-2.5 rounded bg-white dark:bg-ink-900/80 border border-ink-200 dark:border-ink-800 space-y-1">
+                        <p className="font-bold text-emerald-600 dark:text-emerald-400 mb-1">After Cleaning (Lossless)</p>
+                        <ul className="space-y-1 list-disc list-inside text-ink-600 dark:text-ink-400">
                           <li>All EXIF, GPS, IPTC, and XMP blocks carved</li>
-                          <li>Image pixel entropy bitstream 100% untouched</li>
-                          <li>Orientation & ColorSpace preserved losslessly</li>
+                          <li>Pixel entropy bitstream 100% untouched</li>
+                          <li>ICC color profile & orientation preserved losslessly</li>
+                          {selectedItem.cleanedSize && selectedItem.file.size > selectedItem.cleanedSize && (
+                            <li className="text-emerald-600 dark:text-emerald-400 font-bold">
+                              Excised: -{formatSize(selectedItem.file.size - selectedItem.cleanedSize)} overhead
+                            </li>
+                          )}
                         </ul>
                       </div>
                     </div>
@@ -325,11 +330,23 @@ export default function FileQueue({
   );
 }
 
+function getFormatBadge(file) {
+  const name = file.name.toLowerCase();
+  if (name.endsWith('.jpg') || name.endsWith('.jpeg')) return 'JPG';
+  if (name.endsWith('.png')) return 'PNG';
+  if (name.endsWith('.webp')) return 'WEBP';
+  if (name.endsWith('.avif')) return 'AVIF';
+  if (name.endsWith('.heic') || name.endsWith('.heif')) return 'HEIC';
+  if (name.endsWith('.gif')) return 'GIF';
+  return 'IMG';
+}
+
 function FileFrame({ item, isSelected, onSelect, onRemove, onCleanSingle, onSaveSingle }) {
   const isReading = item.status === 'READING';
   const isProcessing = item.status === 'PROCESSING';
   const isCleaned = item.status === 'CLEANED';
   const isError = item.status === 'ERROR';
+  const formatBadge = getFormatBadge(item.file);
 
   return (
     <div
@@ -347,13 +364,17 @@ function FileFrame({ item, isSelected, onSelect, onRemove, onCleanSingle, onSave
         className="w-full text-left focus:outline-none focus:ring-2 focus:ring-safelight-500 rounded-sm cursor-pointer"
       >
         {/* Thumbnail */}
-        <div className="w-full h-[76px] bg-ink-200 dark:bg-ink-800">
+        <div className="relative w-full h-[76px] bg-ink-200 dark:bg-ink-800">
           <img
             src={item.thumbnailUrl}
             alt={item.file.name}
             className="w-full h-full object-cover"
             loading="lazy"
           />
+          {/* Format Badge Chip */}
+          <div className="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-ink-950/80 backdrop-blur-xs text-[8px] font-mono font-bold text-ink-200 border border-ink-700/60 pointer-events-none">
+            {formatBadge}
+          </div>
         </div>
 
         {/* Caption strip */}
