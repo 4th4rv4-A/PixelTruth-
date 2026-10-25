@@ -155,8 +155,14 @@ describe('stripMetadata service functions', () => {
       );
     });
 
-    it('attaches output contract metadata to returned Blob', async () => {
+    it('attaches output contract metadata and verification to returned Blob', async () => {
       const file = new File(['mock'], 'photo.heic', { type: 'image/heic' });
+      const mockVerification = {
+        status: 'VERIFICATION_PASSED',
+        remnants: [],
+        summary: 'Verification passed: zero metadata remnants detected.'
+      };
+
       imagePool.dispatch.mockResolvedValueOnce({
         buffer: new Uint8Array([0xFF, 0xD8, 0xFF, 0xD9]).buffer,
         inputFormat: 'heic',
@@ -164,6 +170,7 @@ describe('stripMetadata service functions', () => {
         mimeType: 'image/jpeg',
         isLossless: false,
         warnings: ['HEIC converted to clean JPEG.'],
+        verification: mockVerification,
       });
 
       const blob = await cleanImageFile(file);
@@ -172,6 +179,7 @@ describe('stripMetadata service functions', () => {
       expect(blob.outputFormat).toBe('jpeg');
       expect(blob.isLossless).toBe(false);
       expect(blob.warnings).toEqual(['HEIC converted to clean JPEG.']);
+      expect(blob.verification).toEqual(mockVerification);
     });
   });
 });

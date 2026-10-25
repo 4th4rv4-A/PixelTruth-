@@ -261,13 +261,18 @@ export default function FileQueue({
               {selectedItem.status === 'CLEANED' && (
                 <div className="p-3.5 rounded-md bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/40 text-xs space-y-2">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <div className="w-5 h-5 rounded-full bg-emerald-100 dark:bg-emerald-900/60 flex items-center justify-center text-emerald-600 dark:text-emerald-400 font-bold shrink-0">
                         ✓
                       </div>
                       <span className="font-semibold text-emerald-900 dark:text-emerald-200">
                         Lossless Binary Sanitization Verified
                       </span>
+                      {selectedItem.cleanedVerification?.status === 'VERIFICATION_PASSED' && (
+                        <span className="px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 font-mono text-[10px] font-bold">
+                          0 BYTES LEAKED
+                        </span>
+                      )}
                     </div>
                     <div className="flex items-center gap-2 text-ink-600 dark:text-ink-400">
                       <span>Original: <strong className="text-ink-900 dark:text-ink-200">{formatSize(selectedItem.file.size)}</strong></span>
@@ -303,6 +308,14 @@ export default function FileQueue({
                           )}
                         </ul>
                       </div>
+                      {selectedItem.cleanedVerification && (
+                        <div className="sm:col-span-2 p-2 rounded bg-white dark:bg-ink-900/80 border border-ink-200 dark:border-ink-800 flex items-center justify-between text-[11px] font-mono">
+                          <span className="text-ink-600 dark:text-ink-400">Post-Clean Verification:</span>
+                          <span className="text-emerald-600 dark:text-emerald-400 font-bold">
+                            {selectedItem.cleanedVerification.status === 'VERIFICATION_PASSED' ? '✓ VERIFICATION PASSED (0 LEAKS)' : selectedItem.cleanedVerification.status}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

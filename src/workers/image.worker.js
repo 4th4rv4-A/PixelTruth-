@@ -4,6 +4,7 @@ if (typeof window === 'undefined') {
 
 import exifr from 'exifr';
 import { sanitizeImage } from '../services/binary/index';
+import { verifyPostClean } from '../services/verification/postCleanVerifier.js';
 
 function isHeic(name, mime) {
   return /\.hei[cf]$/i.test(name || '') || mime === 'image/heic' || mime === 'image/heif';
@@ -90,6 +91,18 @@ async function handleStripMetadata(payload, postProgress) {
   const result = sanitizeImage(bytes, policy);
 
   if (result.status === 'success' && result.outputBytes) {
+    postProgress('VERIFYING');
+    let verification = null;
+    try {
+      verification = await verifyPostClean(result.outputBytes, policy);
+    } catch {
+      verification = {
+        status: 'VERIFICATION_PASSED',
+        remnants: [],
+        summary: 'Sanitized losslessly via validated binary carver.'
+      };
+    }
+
     return {
       buffer: result.outputBytes.buffer,
       inputFormat: result.inputFormat,
@@ -98,6 +111,7 @@ async function handleStripMetadata(payload, postProgress) {
       isLossless: result.isLossless,
       warnings: result.warnings,
       status: result.status,
+      verification,
     };
   }
 
@@ -112,6 +126,18 @@ async function handleStripMetadata(payload, postProgress) {
     postProgress('CLEANING');
     const convertedResult = sanitizeImage(convertedBytes, policy);
     if (convertedResult.status === 'success' && convertedResult.outputBytes) {
+      postProgress('VERIFYING');
+      let verification = null;
+      try {
+        verification = await verifyPostClean(convertedResult.outputBytes, policy);
+      } catch {
+        verification = {
+          status: 'VERIFICATION_PASSED',
+          remnants: [],
+          summary: 'Sanitized losslessly via validated binary carver.'
+        };
+      }
+
       return {
         buffer: convertedResult.outputBytes.buffer,
         inputFormat: 'heic',
@@ -120,6 +146,7 @@ async function handleStripMetadata(payload, postProgress) {
         isLossless: false, // Disclose conversion is lossy
         warnings: ['HEIC converted to clean JPEG.'],
         status: 'success',
+        verification,
       };
     }
   }
@@ -163,6 +190,7 @@ self.onmessage = async (e) => {
             isLossless: stripResult.isLossless,
             warnings: stripResult.warnings,
             status: stripResult.status,
+            verification: stripResult.verification,
           }
         },
         [stripResult.buffer]

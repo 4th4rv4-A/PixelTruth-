@@ -287,6 +287,7 @@ export default function App() {
                 cleanedBlob,
                 cleanedName: outputName,
                 cleanedSize: cleanedBlob.size,
+                cleanedVerification: cleanedBlob.verification || null,
               }
             : f
         )
@@ -327,6 +328,7 @@ export default function App() {
             cleanedBlob: res.blob,
             cleanedName: res.name,
             cleanedSize: res.blob.size,
+            cleanedVerification: res.blob.verification || null,
           };
         }
         return f;

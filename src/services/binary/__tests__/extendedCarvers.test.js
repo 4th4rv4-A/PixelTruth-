@@ -253,6 +253,40 @@ describe('Lossless AVIF Metadata Carver (avifCarver.js)', () => {
     expect(result.status).toBe('success');
     expect(result.removedSegments).toContain('AVIF_METADATA_IDAT');
   });
+
+  it('handles AVIF 64-bit extended box size and bounds checks safely', () => {
+    const ftyp = [
+      0x00, 0x00, 0x00, 0x14, // size 20
+      0x66, 0x74, 0x79, 0x70, // 'ftyp'
+      0x61, 0x76, 0x69, 0x66, // 'avif'
+      0x00, 0x00, 0x00, 0x00,
+      0x61, 0x76, 0x69, 0x73  // 'avis'
+    ];
+    // Box with boxSize === 1 (64-bit extended size = 24 bytes total)
+    const largeBox = [
+      0x00, 0x00, 0x00, 0x01, // boxSize 1 => extended
+      0x66, 0x72, 0x65, 0x65, // 'free'
+      0x00, 0x00, 0x00, 0x00, // high 32 bits = 0
+      0x00, 0x00, 0x00, 0x18, // low 32 bits = 24 bytes
+      0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 // 8 bytes padding
+    ];
+    const raw = new Uint8Array([...ftyp, ...largeBox]);
+    const res = sanitizeAvif(raw);
+    expect(res.status).toBe('fallback-required'); // no meta box in container
+    expect(res.removedSegments).toContain('DISCARDABLE_PADDING');
+  });
+
+  it('safely handles GIF with unterminated sub-block streams without hanging', () => {
+    const bytes = [
+      0x47, 0x49, 0x46, 0x38, 0x39, 0x61, // GIF89a
+      0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, // LSD
+      0x21, 0xFE, 0x05, 0x41, 0x42, 0x43 // Comment with subLen 5 but stream ends abruptly
+    ];
+    const raw = new Uint8Array(bytes);
+    const res = sanitizeGif(raw);
+    expect(res.status).toBe('success');
+    expect(res.removedSegments).toContain('COMMENT_EXTENSION');
+  });
 });
 
 describe('SanitizeImage Routing (index.js)', () => {

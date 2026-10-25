@@ -64,6 +64,12 @@ export function sanitizePng(inputBytes, rawPolicy = {}) {
                       (inputBytes[offset + 2] << 8) |
                       (inputBytes[offset + 3])) >>> 0;
 
+    if (chunkLen > 0x7FFFFFFF) {
+      result.status = 'malformed';
+      result.error = 'Chunk length exceeds 2GB maximum allowed by PNG specification.';
+      return createResult(result);
+    }
+
     const chunkTypeBytes = inputBytes.subarray(offset + 4, offset + 8);
     const chunkType = textDecoder.decode(chunkTypeBytes);
 

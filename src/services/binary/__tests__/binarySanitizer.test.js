@@ -602,6 +602,30 @@ describe('Binary Sanitizer Engine', () => {
       expect(result.error).toMatch(/no image payload/i);
     });
 
+    it('rejects PNG chunk length exceeding 2GB specification limit', () => {
+      const sig = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+      // Chunk length with MSB set: 0x80000000 > 0x7FFFFFFF
+      const badChunk = [0x80, 0x00, 0x00, 0x00, 0x74, 0x45, 0x58, 0x74, 0, 0, 0, 0];
+      const raw = new Uint8Array([...sig, ...badChunk]);
+
+      const result = sanitizePng(raw, {});
+      expect(result.status).toBe('malformed');
+      expect(result.error).toMatch(/exceeds 2GB/i);
+    });
+
+    it('rejects JPEG with invalid segment length less than 2', () => {
+      const raw = new Uint8Array([
+        0xFF, 0xD8, // SOI
+        0xFF, 0xE1, // APP1
+        0x00, 0x01, // segLen = 1 (< 2 invalid)
+        0x00
+      ]);
+
+      const result = sanitizeJpeg(raw, {});
+      expect(result.status).toBe('malformed');
+      expect(result.error).toMatch(/must be at least 2/i);
+    });
+
     it('populates consistent output contract on result object', () => {
       const jpeg = createMockJpeg();
       const result = sanitizeImage(jpeg, { removeExif: true });

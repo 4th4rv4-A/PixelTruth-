@@ -70,4 +70,32 @@ describe('Worker Payload Contract', () => {
       pool.handleMessage({ worker: mockWorker, activeJobId: 'job_1' }, { id: 'job_1', type: 'COMPLETE', result: {} });
     }).not.toThrow();
   });
+
+  it('recycles worker to release V8 heap memory when jobCount reaches maxJobsPerWorker', async () => {
+    const { WorkerPool } = await import('../../src/workers/pool.js');
+    const mockWorker = {
+      postMessage: vi.fn(),
+      terminate: vi.fn(),
+    };
+    // Initialize pool with maxJobsPerWorker = 2
+    const pool = new WorkerPool(() => mockWorker, 1, 5000, 2);
+
+    const workerObj = { worker: mockWorker, activeJobId: 'job_a', timeoutId: null, jobCount: 0 };
+    pool.workers.push(workerObj);
+    pool.activeJobs.set('job_a', { id: 'job_a', resolve: vi.fn(), reject: vi.fn() });
+
+    // Complete job 1
+    pool.handleMessage(workerObj, { id: 'job_a', type: 'COMPLETE', result: {} });
+    expect(workerObj.jobCount).toBe(1);
+    expect(mockWorker.terminate).not.toHaveBeenCalled();
+
+    // Setup and complete job 2
+    workerObj.activeJobId = 'job_b';
+    pool.activeJobs.set('job_b', { id: 'job_b', resolve: vi.fn(), reject: vi.fn() });
+    pool.handleMessage(workerObj, { id: 'job_b', type: 'COMPLETE', result: {} });
+
+    // JobCount is now 2 >= maxJobsPerWorker (2), so worker should be terminated for recycling
+    expect(mockWorker.terminate).toHaveBeenCalledTimes(1);
+    expect(pool.workers).not.toContain(workerObj);
+  });
 });

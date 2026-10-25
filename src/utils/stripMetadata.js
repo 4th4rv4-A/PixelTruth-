@@ -40,6 +40,7 @@ export async function stripFull(file, fullSanitize = false, onProgress, signal) 
   blob.outputFormat = result.outputFormat;
   blob.isLossless = result.isLossless ?? true;
   blob.warnings = result.warnings || [];
+  blob.verification = result.verification || null;
   return blob;
 }
 
@@ -73,6 +74,7 @@ export async function stripSelective(file, keepTags = [], fullSanitize = false, 
   blob.outputFormat = result.outputFormat;
   blob.isLossless = result.isLossless ?? true;
   blob.warnings = result.warnings || [];
+  blob.verification = result.verification || null;
   return blob;
 }
 

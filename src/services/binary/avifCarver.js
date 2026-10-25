@@ -43,20 +43,26 @@ export function sanitizeAvif(inputBytes, _policy = {}) {
   let metaFound = false;
 
   while (offset + 8 <= len) {
-    let boxSize = (outputBytes[offset] << 24) |
-                  (outputBytes[offset + 1] << 16) |
-                  (outputBytes[offset + 2] << 8) |
-                  outputBytes[offset + 3];
+    let boxSize = ((outputBytes[offset] << 24) |
+                   (outputBytes[offset + 1] << 16) |
+                   (outputBytes[offset + 2] << 8) |
+                   outputBytes[offset + 3]) >>> 0;
 
     const boxType = textDecoder.decode(outputBytes.subarray(offset + 4, offset + 8));
 
     let headerSize = 8;
     if (boxSize === 1) {
       if (offset + 16 > len) break;
-      boxSize = (outputBytes[offset + 12] << 24) |
-                (outputBytes[offset + 13] << 16) |
-                (outputBytes[offset + 14] << 8) |
-                outputBytes[offset + 15];
+      const high = ((outputBytes[offset + 8] << 24) |
+                    (outputBytes[offset + 9] << 16) |
+                    (outputBytes[offset + 10] << 8) |
+                    outputBytes[offset + 11]) >>> 0;
+      const low = ((outputBytes[offset + 12] << 24) |
+                   (outputBytes[offset + 13] << 16) |
+                   (outputBytes[offset + 14] << 8) |
+                   outputBytes[offset + 15]) >>> 0;
+      if (high > 0x1FFFFF) break;
+      boxSize = high * 0x100000000 + low;
       headerSize = 16;
     } else if (boxSize === 0) {
       boxSize = len - offset;
@@ -77,19 +83,25 @@ export function sanitizeAvif(inputBytes, _policy = {}) {
 
       // Scan child boxes inside meta
       while (childOffset + 8 <= metaEnd) {
-        let childSize = (outputBytes[childOffset] << 24) |
-                        (outputBytes[childOffset + 1] << 16) |
-                        (outputBytes[childOffset + 2] << 8) |
-                        outputBytes[childOffset + 3];
+        let childSize = ((outputBytes[childOffset] << 24) |
+                         (outputBytes[childOffset + 1] << 16) |
+                         (outputBytes[childOffset + 2] << 8) |
+                         outputBytes[childOffset + 3]) >>> 0;
         const childType = textDecoder.decode(outputBytes.subarray(childOffset + 4, childOffset + 8));
 
         let childHeader = 8;
         if (childSize === 1) {
           if (childOffset + 16 > metaEnd) break;
-          childSize = (outputBytes[childOffset + 12] << 24) |
-                      (outputBytes[childOffset + 13] << 16) |
-                      (outputBytes[childOffset + 14] << 8) |
-                      outputBytes[childOffset + 15];
+          const high = ((outputBytes[childOffset + 8] << 24) |
+                        (outputBytes[childOffset + 9] << 16) |
+                        (outputBytes[childOffset + 10] << 8) |
+                        outputBytes[childOffset + 11]) >>> 0;
+          const low = ((outputBytes[childOffset + 12] << 24) |
+                       (outputBytes[childOffset + 13] << 16) |
+                       (outputBytes[childOffset + 14] << 8) |
+                       outputBytes[childOffset + 15]) >>> 0;
+          if (high > 0x1FFFFF) break;
+          childSize = high * 0x100000000 + low;
           childHeader = 16;
         } else if (childSize === 0) {
           childSize = metaEnd - childOffset;

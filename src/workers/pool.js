@@ -8,8 +8,9 @@ export class WorkerPool {
    * @param {Function} workerFactory Function that returns a new Worker instance
    * @param {number} maxConcurrency Maximum number of active workers
    * @param {number} timeoutMs Optional timeout to force terminate a worker
+   * @param {number} maxJobsPerWorker Maximum jobs before worker is recycled (triggers GC)
    */
-  constructor(workerFactory, maxConcurrency = null, timeoutMs = 60000) {
+  constructor(workerFactory, maxConcurrency = null, timeoutMs = 60000, maxJobsPerWorker = 15) {
     this.workerFactory = workerFactory;
     
     // Determine a sensible default concurrency limit
@@ -17,8 +18,9 @@ export class WorkerPool {
                  ? navigator.hardwareConcurrency : 4;
     this.maxConcurrency = maxConcurrency || Math.max(1, Math.min(4, hw - 1));
     this.timeoutMs = timeoutMs;
+    this.maxJobsPerWorker = maxJobsPerWorker;
     
-    this.workers = [];      // { worker, activeJobId, timeoutId }
+    this.workers = [];      // { worker, activeJobId, timeoutId, jobCount }
     this.queue = [];        // { id, type, payload, transfer, resolve, reject, onProgress, signal, abortHandler }
     this.activeJobs = new Map(); // id -> job details
   }
@@ -113,7 +115,7 @@ export class WorkerPool {
     // If no idle worker, try to spawn one
     if (!workerObj && this.workers.length < this.maxConcurrency) {
       const worker = this.workerFactory();
-      workerObj = { worker, activeJobId: null, timeoutId: null };
+      workerObj = { worker, activeJobId: null, timeoutId: null, jobCount: 0 };
       
       worker.onmessage = (e) => this.handleMessage(workerObj, e.data);
       worker.onerror = (err) => {
@@ -197,6 +199,7 @@ export class WorkerPool {
   finishJob(workerObj, jobId) {
     if (workerObj.activeJobId === jobId) {
       workerObj.activeJobId = null;
+      workerObj.jobCount = (workerObj.jobCount || 0) + 1;
       if (workerObj.timeoutId) {
         clearTimeout(workerObj.timeoutId);
         workerObj.timeoutId = null;
@@ -209,6 +212,12 @@ export class WorkerPool {
         job.signal.removeEventListener('abort', job.abortHandler);
       }
       this.activeJobs.delete(jobId);
+    }
+
+    // Proactively recycle worker if it exceeded max allowed jobs to release V8 heaps
+    if (workerObj.jobCount >= this.maxJobsPerWorker && workerObj.activeJobId === null) {
+      this.terminateWorker(workerObj);
+      return;
     }
 
     // Trigger next job

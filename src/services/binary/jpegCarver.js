@@ -425,6 +425,12 @@ export function sanitizeJpeg(inputBytes, rawPolicy = {}) {
     }
 
     const segLen = (inputBytes[offset + 2] << 8) | inputBytes[offset + 3];
+    if (segLen < 2) {
+      result.status = 'malformed';
+      result.error = `Invalid segment length: ${segLen}. Must be at least 2 bytes.`;
+      return createResult(result);
+    }
+
     const nextOffset = offset + 2 + segLen;
 
     if (nextOffset > len) {
@@ -442,8 +448,13 @@ export function sanitizeJpeg(inputBytes, rawPolicy = {}) {
     if (marker === MARKERS.SOS) {
       // SOS reached. Everything from here to EOI is image data.
       // Scan entropy-coded scan data for the true EOI (0xFF 0xD9) marker to truncate any trailing payloads.
-      const sosSegLen = (inputBytes[offset + 2] << 8) | inputBytes[offset + 3];
-      const scanStart = offset + 2 + sosSegLen;
+      const scanStart = nextOffset;
+
+      if (scanStart > len) {
+        result.status = 'malformed';
+        result.error = 'SOS scan data begins past end of file.';
+        return createResult(result);
+      }
       
       let eoiOffset = -1;
       let scanIdx = scanStart;

@@ -14,6 +14,27 @@ function bufferStartsWith(buffer, offset, signature) {
   return true;
 }
 
+const MAX_SUB_BLOCKS = 10000;
+
+/**
+ * Safely skips GIF sub-blocks with iteration limit and bound clamping.
+ * @param {Uint8Array} bytes
+ * @param {number} startOffset
+ * @param {number} len
+ * @returns {number} advanced offset
+ */
+function skipSubBlocks(bytes, startOffset, len) {
+  let curr = startOffset;
+  let blocks = 0;
+  while (curr < len && blocks++ < MAX_SUB_BLOCKS) {
+    const subLen = bytes[curr];
+    curr += 1;
+    if (subLen === 0) break;
+    curr = Math.min(curr + subLen, len);
+  }
+  return curr;
+}
+
 /**
  * Losslessly sanitizes a GIF file (GIF87a or GIF89a).
  * Strips Comment Extensions (0x21 0xFE) and XMP / metadata Application Extensions (0x21 0xFF),
@@ -117,12 +138,7 @@ export function sanitizeGif(inputBytes, policy = {}) {
         }
 
         // Skip sub-blocks
-        while (offset < len) {
-          const subLen = inputBytes[offset];
-          offset += 1;
-          if (subLen === 0) break;
-          offset += subLen;
-        }
+        offset = skipSubBlocks(inputBytes, offset, len);
 
         currentSliceStart = offset;
         removedSegments.push('COMMENT_EXTENSION');
@@ -146,12 +162,7 @@ export function sanitizeGif(inputBytes, policy = {}) {
         if (isNetscape) {
           // Preserve animation loop header!
           // Skip sub-blocks
-          while (offset < len) {
-            const subLen = inputBytes[offset];
-            offset += 1;
-            if (subLen === 0) break;
-            offset += subLen;
-          }
+          offset = skipSubBlocks(inputBytes, offset, len);
           preservedSegments.push('ANIMATION_EXTENSION');
           continue;
         } else {
@@ -160,12 +171,7 @@ export function sanitizeGif(inputBytes, policy = {}) {
             retainedSlices.push({ start: currentSliceStart, end: extStart });
           }
 
-          while (offset < len) {
-            const subLen = inputBytes[offset];
-            offset += 1;
-            if (subLen === 0) break;
-            offset += subLen;
-          }
+          offset = skipSubBlocks(inputBytes, offset, len);
 
           currentSliceStart = offset;
           removedSegments.push('APPLICATION_EXTENSION');
@@ -180,12 +186,7 @@ export function sanitizeGif(inputBytes, policy = {}) {
             retainedSlices.push({ start: currentSliceStart, end: extStart });
           }
 
-          while (offset < len) {
-            const subLen = inputBytes[offset];
-            offset += 1;
-            if (subLen === 0) break;
-            offset += subLen;
-          }
+          offset = skipSubBlocks(inputBytes, offset, len);
 
           currentSliceStart = offset;
           removedSegments.push('PLAIN_TEXT_EXTENSION');
@@ -194,12 +195,7 @@ export function sanitizeGif(inputBytes, policy = {}) {
       }
 
       // Generic extension fallback: read sub-blocks
-      while (offset < len) {
-        const subLen = inputBytes[offset];
-        offset += 1;
-        if (subLen === 0) break;
-        offset += subLen;
-      }
+      offset = skipSubBlocks(inputBytes, offset, len);
       continue;
     }
 
@@ -224,12 +220,7 @@ export function sanitizeGif(inputBytes, policy = {}) {
       }
 
       // Image data sub-blocks
-      while (offset < len) {
-        const subLen = inputBytes[offset];
-        offset += 1;
-        if (subLen === 0) break;
-        offset += subLen;
-      }
+      offset = skipSubBlocks(inputBytes, offset, len);
 
       preservedSegments.push('IMAGE_DESCRIPTOR');
       continue;
